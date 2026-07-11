@@ -1,4 +1,3 @@
-
 package com.haydirastgele.utils;
 
 import net.minecraft.core.BlockPos;
@@ -10,6 +9,8 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.projectile.LargeFireball;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 
@@ -31,6 +32,28 @@ public class MobManager {
     private static final List<String> TIER_80 = Arrays.asList("enderman");
     private static final List<String> TIER_90 = Arrays.asList("iron_golem");
     private static final List<String> TIER_100 = Arrays.asList("warden", "wither", "elder_guardian");
+
+    public static void triggerFormAbility(ServerPlayer player) {
+        String form = currentMobForm.toLowerCase();
+        ServerLevel level = (ServerLevel) player.level();
+
+        if (form.contains("ghast")) {
+            Vec3 look = player.getLookAngle();
+            LargeFireball fireball = new LargeFireball(level, player, look.x, look.y, look.z, 1);
+            fireball.setPos(player.getX(), player.getEyeY(), player.getZ());
+            level.addFreshEntity(fireball);
+            player.sendSystemMessage(Component.literal("§c[!] Ateş topu fırlattınız!"));
+        } else if (form.contains("warden")) {
+            player.level().getEntitiesOfClass(LivingEntity.class, player.getBoundingBox().inflate(10.0D)).forEach(entity -> {
+                if (entity != player) {
+                    entity.hurt(player.damageSources().sonicBoom(player), 20.0F);
+                }
+            });
+            player.sendSystemMessage(Component.literal("§4[!] Sonik Patlama gerçekleşti!"));
+        } else {
+            player.sendSystemMessage(Component.literal("§e[!] Bu formun özel bir yeteneği yok."));
+        }
+    }
 
     public static void handlePlayerDeath(ServerPlayer player) {
         String mob = currentMobForm.toLowerCase();
@@ -65,6 +88,11 @@ public class MobManager {
         if (player.getAttribute(Attributes.ATTACK_DAMAGE) != null) {
             double originalDamage = getOriginalMobDamage(currentMobForm.toLowerCase());
             player.getAttribute(Attributes.ATTACK_DAMAGE).setBaseValue(originalDamage);
+        }
+        if (player.getAttribute(Attributes.MAX_HEALTH) != null) {
+            double originalHealth = getOriginalMobHealth(currentMobForm.toLowerCase());
+            player.getAttribute(Attributes.MAX_HEALTH).setBaseValue(originalHealth);
+            player.setHealth((float) originalHealth);
         }
     }
 
@@ -102,22 +130,18 @@ public class MobManager {
                 event.setCanceled(true);
                 player.sendSystemMessage(Component.literal("§c[!] Bu form ile en fazla " + maxRange + " blok mesafeye vurabilirsiniz!"));
             } else {
-                // Yeni Eklenen: Bize saldıran veya bizim vurduğumuz hedefe parlama (Glow) efekti verme
                 target.addEffect(new MobEffectInstance(MobEffects.GLOWING, 100, 0, false, false));
-                player.sendSystemMessage(Component.literal("§b[!] Hedefe kilitlenildi ve işaretlendi!"));
             }
         }
     }
 
-    // Doğal düşman olmayan mobların (örneğin pasif formdayken undead/monster olmayanların) saldırmasını engelleme kontrolü
     public static boolean shouldMobIgnorePlayer(LivingEntity mob, ServerPlayer player) {
         String form = currentMobForm.toLowerCase();
         String mobName = mob.getType().getDescriptionId().toLowerCase();
         
-        // Eğer köylü veya pasif bir formdaysak zombiler dışındakiler saldırmasın mantığı
         if ((form.contains("villager") || form.contains("cow") || form.contains("sheep") || form.contains("pig")) 
             && (mobName.contains("cow") || mobName.contains("sheep") || mobName.contains("pig"))) {
-            return true; // Kendi türünden sayar, saldırmaz
+            return true;
         }
         return false;
     }
@@ -191,6 +215,14 @@ public class MobManager {
         return 2.0D; 
     }
 
+    private static double getOriginalMobHealth(String form) {
+        if (form.contains("warden")) return 500.0D;
+        if (form.contains("iron_golem")) return 100.0D;
+        if (form.contains("wither")) return 300.0D;
+        if (form.contains("zombie") || form.contains("skeleton")) return 20.0D;
+        return 20.0D;
+    }
+
     private static double getOriginalMobAttackRange(String form) {
         if (form.contains("iron_golem")) return 2.0D; 
         if (form.contains("warden")) return 4.5D; 
@@ -240,4 +272,4 @@ public class MobManager {
         return TIER_0;
     }
             }
-  
+                                 
