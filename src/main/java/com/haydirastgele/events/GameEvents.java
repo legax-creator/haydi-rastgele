@@ -2,6 +2,7 @@ package com.haydirastgele.events;
 
 import com.haydirastgele.utils.MobManager;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.GoatHornItem;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
@@ -9,6 +10,7 @@ import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
 public class GameEvents {
+
     @SubscribeEvent
     public static void onDeath(LivingDeathEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
@@ -33,16 +35,23 @@ public class GameEvents {
         MobManager.handleAttack(event);
     }
 
-    // Yeni Eklenen: Blok koyma ve bloklarla etkileşime girme engeli
     @SubscribeEvent
     public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
         if (event.getEntity() instanceof ServerPlayer player) {
-            // MobManager içinde bu formun blok koyup/etkileşime giremediğini kontrol edeceğiz
             if (MobManager.isInteractionRestricted(player)) {
                 event.setCanceled(true);
                 player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§c[!] Bu formdayken blok koyamaz veya etkileşime giremezsiniz!"));
             }
         }
     }
-}
 
+    @SubscribeEvent
+    public static void onRightClickItem(PlayerInteractEvent.RightClickItem event) {
+        if (event.getItemStack().getItem() instanceof GoatHornItem) {
+            if (event.getEntity() instanceof ServerPlayer player) {
+                MobManager.triggerFormAbility(player);
+                event.setCanceled(true); 
+            }
+        }
+    }
+}
