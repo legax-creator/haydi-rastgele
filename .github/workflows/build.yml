@@ -20,10 +20,13 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
-    - name: Sistem Gradle'ını Kur
+    # Burada Gradle sürümünü Forge'un desteklediği 8.5 sürümüne sabitliyoruz
+    - name: Uyumlu Gradle Sürümünü Kur (Gradle 8.5)
       uses: gradle/actions/setup-gradle@v3
+      with:
+        gradle-version: '8.5'
 
-    - name: Modu Derle (Sistem Gradle ile)
+    - name: Modu Derle
       run: gradle build
 
     - name: Oluşan Jar Dosyasını Kaydet (Artifact)
