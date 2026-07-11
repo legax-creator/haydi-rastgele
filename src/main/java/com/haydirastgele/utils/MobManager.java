@@ -79,6 +79,9 @@ public class MobManager {
             player.sendSystemMessage(Component.literal("§d[!] Şans eseri bebek formunda doğdunuz!"));
         }
         applyFormRestrictions(player);
+        
+        // Boyut güncellenmesi için Minecraft motorunu tetikliyoruz
+        player.refreshDimensions();
     }
 
     public static void applyFormRestrictions(ServerPlayer player) {
@@ -94,6 +97,36 @@ public class MobManager {
             player.getAttribute(Attributes.MAX_HEALTH).setBaseValue(originalHealth);
             player.setHealth((float) originalHealth);
         }
+    }
+
+    public static float getMobWidth(String form) {
+        if (form.contains("ghast")) return 4.0F;
+        if (form.contains("warden")) return 0.9F;
+        if (form.contains("iron_golem")) return 1.4F;
+        if (form.contains("spider")) return 1.4F;
+        if (form.contains("chicken") || form.contains("rabbit")) return 0.4F;
+        if (form.contains("silverfish") || form.contains("endermite")) return 0.4F;
+        return 0.6F; // İnsan/Standart
+    }
+
+    public static float getMobHeight(String form) {
+        if (form.contains("ghast")) return 4.0F;
+        if (form.contains("warden")) return 2.9F;
+        if (form.contains("iron_golem")) return 2.7F;
+        if (form.contains("enderman")) return 2.9F;
+        if (form.contains("chicken")) return 0.7F;
+        if (form.contains("rabbit")) return 0.5F;
+        if (form.contains("silverfish")) return 0.3F;
+        return 1.8F; // İnsan/Standart
+    }
+
+    public static float getMobEyeHeight(String form) {
+        if (form.contains("ghast")) return 2.0F;
+        if (form.contains("warden")) return 2.6F;
+        if (form.contains("iron_golem")) return 2.25F;
+        if (form.contains("enderman")) return 2.55F;
+        if (form.contains("chicken")) return 0.5F;
+        return 1.62F; // İnsan/Standart
     }
 
     public static void handleInteract(PlayerInteractEvent.EntityInteract event) {
@@ -272,4 +305,3 @@ public class MobManager {
         return TIER_0;
     }
             }
-                                 
