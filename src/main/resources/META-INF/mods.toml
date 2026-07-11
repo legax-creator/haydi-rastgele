@@ -1,0 +1,14 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="All Rights Reserved"
+
+[[mods]]
+modId="haydirastgele"
+version="1.0.0"
+displayName="Haydirastgele"
+displayURL="https://github.com/senin-kullanici-adin/haydirastgele"
+authors="İnsanazor"
+description='''
+Oyuncuların rastgele mob formlarına büründüğü, karma sistemine göre güçlendiği ve keçi boynuzu ile özel yetenekler kullandığı benzersiz bir hayatta kalma modu!
+'''
+
