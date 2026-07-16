@@ -37,19 +37,18 @@ public class GameEvents {
         }
     }
 
-    // Her karede koşma ve zıplama durumu kontrol edilir
     @SubscribeEvent
     public static void onPlayerUpdate(LivingEvent.LivingTickEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
             String form = MobManager.currentMobForm.toLowerCase();
             
-            // Eğer koşmaya elverişli olmayan bir formdaysa koşmayı iptal et
             if (player.isSprinting() && !MobManager.canMobSprint(form)) {
                 player.setSprinting(false);
             }
         }
     }
 
+    // --- GÜNCELLENDİ: BLOK KIRMA ENGELİ ---
     @SubscribeEvent
     public static void onBlockBreak(BlockEvent.BreakEvent event) {
         Player player = event.getPlayer();
@@ -57,6 +56,28 @@ public class GameEvents {
             if (MobManager.isInteractionRestricted(serverPlayer)) {
                 event.setCanceled(true);
                 serverPlayer.sendSystemMessage(net.minecraft.network.chat.Component.literal("§c[!] Bu formdayken blok kıramazsınız!"));
+            }
+        }
+    }
+
+    // --- GÜNCELLENDİ: BLOK KOYMA ENGELİ ---
+    @SubscribeEvent
+    public static void onBlockPlace(BlockEvent.EntityPlaceEvent event) {
+        if (event.getEntity() instanceof ServerPlayer serverPlayer) {
+            if (MobManager.isInteractionRestricted(serverPlayer)) {
+                event.setCanceled(true);
+                serverPlayer.sendSystemMessage(net.minecraft.network.chat.Component.literal("§c[!] Bu formdayken blok yerleştiremezsiniz!"));
+            }
+        }
+    }
+
+    // --- GÜNCELLENDİ: BLOK SAĞ TIK ETKİLEŞİM ENGELİ (Sandık, Kapı vb.) ---
+    @SubscribeEvent
+    public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
+        if (event.getEntity() instanceof ServerPlayer serverPlayer) {
+            if (MobManager.isInteractionRestricted(serverPlayer)) {
+                event.setCanceled(true);
+                serverPlayer.sendSystemMessage(net.minecraft.network.chat.Component.literal("§c[!] Bu formdayken bloklarla etkileşime giremezsiniz!"));
             }
         }
     }
