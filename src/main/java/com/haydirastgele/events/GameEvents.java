@@ -53,7 +53,7 @@ public class GameEvents {
                 player.setSprinting(false);
             }
 
-            // --- GÖREV DÖNGÜSÜ tetikleniyor ---
+            // Görev zamanlayıcı sistemini tetikle
             MobManager.tickQuest(player);
         }
     }
