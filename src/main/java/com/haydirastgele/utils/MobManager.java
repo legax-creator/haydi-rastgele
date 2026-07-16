@@ -448,4 +448,71 @@ public class MobManager {
         if (form.contains("salmon") || form.contains("cod") || form.contains("pufferfish")) {
             return foodItem.contains("kelp") || foodItem.contains("yosun");
         }
-        if (form.contains("villag
+        if (form.contains("villager")) {
+            return foodItem.contains("bread") || foodItem.contains("ekmek");
+        }
+        return true; 
+    }
+
+    private static double getOriginalMobDamage(String form) {
+        if (form.contains("warden")) return 30.0D; 
+        if (form.contains("iron_golem")) return 15.0D; 
+        if (form.contains("wither")) return 8.0D; 
+        
+        if (form.contains("zombie") || form.contains("piglin")) return 3.0D;
+        if (form.contains("spider")) return 2.0D;
+        if (form.contains("silverfish")) return 1.0D;
+
+        return 2.0D; 
+    }
+
+    private static double getOriginalMobHealth(String form) {
+        if (form.contains("warden")) return 500.0D;
+        if (form.contains("iron_golem")) return 100.0D;
+        return 20.0D;
+    }
+
+    public static void applyFormSpawnLocation(ServerPlayer player) {
+        ServerLevel level = (ServerLevel) player.level();
+        String form = currentMobForm.toLowerCase();
+
+        BlockPos spawnPos = player.getRespawnPosition();
+        if (spawnPos == null) {
+            spawnPos = level.getSharedSpawnPos(); 
+        }
+
+        if (form.contains("strider")) {
+            player.teleportTo(level, spawnPos.getX(), level.getSeaLevel(), spawnPos.getZ(), player.getYHeadRot(), player.getXRot());
+        } else {
+            player.teleportTo(level, spawnPos.getX(), spawnPos.getY() + 1, spawnPos.getZ(), player.getYHeadRot(), player.getXRot());
+        }
+    }
+
+    public static String getMobFromExactTier(int karma) {
+        List<String> tierList = getListForTier(karma);
+        return tierList.get(random.nextInt(tierList.size()));
+    }
+
+    public static String getLowerTierEqualShareMob(int currentKarma) {
+        List<String> allLowerMobs = new ArrayList<>();
+        for (int t = 0; t < currentKarma; t += 10) {
+            allLowerMobs.addAll(getListForTier(t));
+        }
+        if (allLowerMobs.isEmpty()) return "frog";
+        return allLowerMobs.get(random.nextInt(allLowerMobs.size()));
+    }
+
+    private static List<String> getListForTier(int karma) {
+        if (karma >= 100) return TIER_100;
+        if (karma >= 90) return TIER_90;
+        if (karma >= 80) return TIER_80;
+        if (karma >= 70) return TIER_70;
+        if (karma >= 60) return TIER_60;
+        if (karma >= 50) return TIER_50;
+        if (karma >= 40) return TIER_40;
+        if (karma >= 30) return TIER_30;
+        if (karma >= 20) return TIER_20;
+        if (karma >= 10) return TIER_10;
+        return TIER_0;
+    }
+}
