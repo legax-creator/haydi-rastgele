@@ -1,9 +1,11 @@
 package com.haydirastgele.events;
 
 import com.haydirastgele.utils.MobManager;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.Items;
@@ -28,8 +30,8 @@ public class GameEvents {
     }
 
     @SubscribeEvent
-    public static void onPlayerRespawn(PlayerEvent.Clone event) {
-        if (event.getEntity() instanceof ServerPlayer player && event.isWasDeath()) {
+    public static void onPlayerRespawn(PlayerEvent.PlayerRespawnEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
             MobManager.handlePlayerRespawn(player);
         }
     }
@@ -55,14 +57,22 @@ public class GameEvents {
         MobManager.handleAttack(event);
     }
 
+    // --- ELDEKİ BOYNUZA DİNAMİK COOLDOWN EKLEYEN SAĞ TIK TETİKLEMESİ ---
     @SubscribeEvent
     public static void onRightClickItem(PlayerInteractEvent.RightClickItem event) {
         if (event.getEntity() instanceof ServerPlayer player) {
-            if (event.getItemStack().is(Items.GOAT_HORN)) {
+            String currentForm = MobManager.currentMobForm.toLowerCase();
+
+            // Sadece özel yetenek sahibi canavarlar keçi boynuzuyla yetenek atabilir
+            if (event.getItemStack().is(Items.GOAT_HORN) && MobManager.hasSpecialAbility(currentForm)) {
+                // Yeteneği çalıştır
                 MobManager.triggerFormAbility(player);
+                
+                // Güç seviyesine göre özel cooldown uygula (Örn: Warden için 15sn, Ghast için 6sn)
+                int cooldownTicks = MobManager.getCooldownTicks(currentForm);
+                player.getCooldowns().addCooldown(Items.GOAT_HORN, cooldownTicks);
             }
             
-            String currentForm = MobManager.currentMobForm;
             String foodName = event.getItemStack().getItem().toString();
             if (event.getItemStack().isEdible() && !MobManager.canEatFood(currentForm, foodName)) {
                 event.setCanceled(true);
@@ -71,7 +81,6 @@ public class GameEvents {
         }
     }
 
-    // --- YENİ: MOB HITBOX BOYUTLARINI OYUNCUYA UYARLAMA ---
     @SubscribeEvent
     public static void onPlayerSize(EntityEvent.Size event) {
         if (event.getEntity() instanceof Player player) {
@@ -81,26 +90,33 @@ public class GameEvents {
                 float height = MobManager.getMobHeight(form);
                 float eyeHeight = MobManager.getMobEyeHeight(form);
                 
-                // Oyuncunun yeni kutu boyutlarını setliyoruz
                 event.setNewSize(EntityDimensions.scalable(width, height));
                 event.setNewEyeHeight(eyeHeight);
             }
         }
     }
 
-    // --- YENİ: DIŞ GÖRÜNÜŞÜ (RENDER) DEĞİŞTİRME ---
     @SubscribeEvent
     public static void onPlayerRender(RenderPlayerEvent.Pre event) {
         Player player = event.getEntity();
         String form = MobManager.currentMobForm.toLowerCase();
 
-        // Eğer oyuncu insan formunda değilse normal insan modelini çizmeyi iptal et
         if (!form.equals("human")) {
             event.setCanceled(true);
             
-            // NOT: İstemci (Client) tarafında oyun motoruna oyuncunun olduğu konuma 
-            // mob modelini bastırma komutudur. İleri düzey 3D motor render çağrısı içerir.
-            // Kompleks çakışmaları önlemek için morph paketini tetikler.
+            if (player.level().isClientSide) {
+                EntityRenderDispatcher dispatcher = Minecraft.getInstance().getEntityRenderDispatcher();
+                EntityType<?> type = EntityType.byString(form).orElse(EntityType.PIG); 
+                Entity mobEntity = type.create(player.level());
+                
+                if (mobEntity != null) {
+                    mobEntity.setPos(player.getX(), player.getY(), player.getZ());
+                    mobEntity.setYRot(player.getYRot());
+                    mobEntity.setXRot(player.getXRot());
+                    
+                    dispatcher.render(mobEntity, 0, 0, 0, player.getYRot(), event.getPartialTick(), event.getPoseStack(), event.getMultiBufferSource(), event.getPackedLight());
+                }
+            }
         }
     }
 }
