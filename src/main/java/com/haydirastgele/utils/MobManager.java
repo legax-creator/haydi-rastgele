@@ -50,7 +50,6 @@ public class MobManager {
         return 60;
     }
 
-    // Mob türüne göre zıplama yüksekliği sınırlamaları
     public static double getMobJumpStrength(String form) {
         form = form.toLowerCase();
         if (form.contains("human")) return 0.42D; 
@@ -70,7 +69,6 @@ public class MobManager {
         return 0.42D; 
     }
 
-    // Mob türüne göre koşma (sprinting) izni
     public static boolean canMobSprint(String form) {
         form = form.toLowerCase();
         if (form.contains("human")) return true;
@@ -81,7 +79,6 @@ public class MobManager {
         return true;
     }
 
-    // Minecraft'ta fiziksel olarak hasar vuramayan pasif varlıklar
     public static boolean canMobDealDamage(String form) {
         form = form.toLowerCase();
         if (form.contains("chicken") || form.contains("cow") || form.contains("sheep") || form.contains("pig") || 
@@ -94,7 +91,7 @@ public class MobManager {
         return true;
     }
 
-    // Orijinal Minecraft mob blok kırma mesafeleri (BLOCK_REACH)
+    // Blok etkileşimi (sol tık blok kırma) menzilleri
     public static double getOriginalMobBlockRange(String form) {
         form = form.toLowerCase();
         if (form.contains("human")) return 4.5D; 
@@ -119,7 +116,7 @@ public class MobManager {
         return 1.0D; 
     }
 
-    // Orijinal Minecraft mob sol tık fiziksel vuruş mesafeleri (ENTITY_REACH)
+    // Saldırı menzilleri (ENTITY_REACH)
     private static double getOriginalMobAttackRange(String form) {
         form = form.toLowerCase();
         if (form.contains("human")) return 3.0D; 
@@ -324,12 +321,21 @@ public class MobManager {
         }
     }
 
+    // --- GÜNCELLENDİ: ARTIK HİÇBİR MOB (KÖYLÜ/GEZGİN TÜCCAR HARİÇ) BLOK ETKİLEŞİMİ YAPAMAZ ---
     public static boolean isInteractionRestricted(ServerPlayer player) {
         String form = currentMobForm.toLowerCase();
+        
+        // Eğer oyuncu insan formundaysa hiçbir kısıtlama yok
+        if (form.equals("human")) {
+            return false; 
+        }
+        
+        // Köylü ve Gezgin Tüccar kapıları açabilir/etkileşime girebilir (Kapı açma istisnası)
         if (form.contains("villager") || form.contains("wandering_trader")) {
             return false;
         }
-        return true;
+        
+        return true; // Geri kalan tüm mobların blok kırma, koyma ve sağ tık etkileşimi yasaklanır
     }
 
     public static boolean canEatFood(String form, String foodItem) {
