@@ -11,6 +11,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.Items;
 import net.minecraftforge.client.event.RenderPlayerEvent;
 import net.minecraftforge.event.entity.EntityEvent;
+import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
@@ -36,6 +37,19 @@ public class GameEvents {
         }
     }
 
+    // Her karede koşma ve zıplama durumu kontrol edilir
+    @SubscribeEvent
+    public static void onPlayerUpdate(LivingEvent.LivingTickEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            String form = MobManager.currentMobForm.toLowerCase();
+            
+            // Eğer koşmaya elverişli olmayan bir formdaysa koşmayı iptal et
+            if (player.isSprinting() && !MobManager.canMobSprint(form)) {
+                player.setSprinting(false);
+            }
+        }
+    }
+
     @SubscribeEvent
     public static void onBlockBreak(BlockEvent.BreakEvent event) {
         Player player = event.getPlayer();
@@ -57,18 +71,13 @@ public class GameEvents {
         MobManager.handleAttack(event);
     }
 
-    // --- ELDEKİ BOYNUZA DİNAMİK COOLDOWN EKLEYEN SAĞ TIK TETİKLEMESİ ---
     @SubscribeEvent
     public static void onRightClickItem(PlayerInteractEvent.RightClickItem event) {
         if (event.getEntity() instanceof ServerPlayer player) {
             String currentForm = MobManager.currentMobForm.toLowerCase();
 
-            // Sadece özel yetenek sahibi canavarlar keçi boynuzuyla yetenek atabilir
             if (event.getItemStack().is(Items.GOAT_HORN) && MobManager.hasSpecialAbility(currentForm)) {
-                // Yeteneği çalıştır
                 MobManager.triggerFormAbility(player);
-                
-                // Güç seviyesine göre özel cooldown uygula (Örn: Warden için 15sn, Ghast için 6sn)
                 int cooldownTicks = MobManager.getCooldownTicks(currentForm);
                 player.getCooldowns().addCooldown(Items.GOAT_HORN, cooldownTicks);
             }
