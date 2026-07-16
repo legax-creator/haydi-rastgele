@@ -113,8 +113,11 @@ public class MobManager {
                     double spawnX = player.getX() + (Math.cos(angle) * 6);
                     double spawnZ = player.getZ() + (Math.sin(angle) * 6);
                     wolf.setPos(spawnX, player.getY() + 1, spawnZ);
-                    wolf.setAngry(true);
+                    
+                    // Kurtların 120 saniye (2400 tick) boyunca öfkeli kalmasını sağlıyoruz
+                    wolf.setRemainingPersistentAngerTime(2400); 
                     wolf.setTarget(player);
+                    
                     level.addFreshEntity(wolf);
                 }
             }
@@ -445,7 +448,7 @@ public class MobManager {
         form = form.toLowerCase();
         foodItem = foodItem.toLowerCase();
         
-        if (form.contains("salmon") || form.contains("cod") || form.contains("pufferfish")) {
+        if (form.contains("salmon") || form.contains("ccod") || form.contains("pufferfish")) {
             return foodItem.contains("kelp") || foodItem.contains("yosun");
         }
         if (form.contains("villager")) {
