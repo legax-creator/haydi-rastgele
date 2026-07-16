@@ -8,6 +8,10 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.boss.wither.WitherBoss;
+import net.minecraft.world.entity.animal.Wolf;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.projectile.LargeFireball;
 import net.minecraft.world.entity.projectile.WitherSkull;
@@ -25,6 +29,12 @@ public class MobManager {
     public static String currentMobForm = "human";
     private static final Random random = new Random();
 
+    // --- KAOS GÖREV SİSTEMİ DEĞİŞKENLERİ ---
+    public static String activeQuestType = "NONE"; // "SALMON_DRY", "SHEEP_WOLVES", "PUFFER_WITHER", "NONE"
+    public static int questTimer = 0; // Saniye cinsinden kalan süre (120 saniye)
+    public static int nextQuestTriggerTicks = random.nextInt(36000); // 30 dakikalık (36000 tick) periyotta rastgele an
+    private static int timeSinceLastQuestTicks = 0;
+
     private static final List<String> TIER_0 = Arrays.asList("salmon", "cod", "villager", "strider", "frog");
     private static final List<String> TIER_10 = Arrays.asList("pufferfish", "silverfish", "horse", "donkey", "parrot", "sniffer", "wandering_trader", "bat", "bee");
     private static final List<String> TIER_20 = Arrays.asList("hoglin", "zombified_piglin", "piglin", "llama");
@@ -37,6 +47,111 @@ public class MobManager {
     private static final List<String> TIER_90 = Arrays.asList("iron_golem");
     private static final List<String> TIER_100 = Arrays.asList("warden", "wither", "elder_guardian");
 
+    // --- KAOS GÖREV ZAMANLAYICISI VE TETİKLEME MOTORU ---
+    public static void tickQuest(ServerPlayer player) {
+        if (activeQuestType.equals("NONE")) {
+            timeSinceLastQuestTicks++;
+            if (timeSinceLastQuestTicks >= nextQuestTriggerTicks) {
+                startRandomKaosQuest(player);
+                timeSinceLastQuestTicks = 0;
+                nextQuestTriggerTicks = random.nextInt(36000); // Sonraki 30 dk için rastgele süre sıfırla
+            }
+        } else {
+            // Görev aktifken saniyede bir kontrol et (Her 20 tick'te bir)
+            if (player.tickCount % 20 == 0) {
+                questTimer--;
+                
+                if (questTimer % 10 == 0 || questTimer <= 10) {
+                    player.displayClientMessage(
+                        Component.literal("§6[KAOS GÖREVİ] §eHayatta kal! Kalan Süre: §c" + questTimer + "s"), 
+                        true
+                    );
+                }
+
+                if (questTimer <= 0) {
+                    completeQuest(player, true); // Süre bitti, kazandı!
+                }
+            }
+        }
+    }
+
+    private static void startRandomKaosQuest(ServerPlayer player) {
+        ServerLevel level = (ServerLevel) player.level();
+        int roll = random.nextInt(3); // 0, 1, 2
+        questTimer = 120; // 2 Dakika
+
+        if (roll == 0) {
+            activeQuestType = "SALMON_DRY";
+            currentMobForm = "salmon";
+            applyFormRestrictions(player);
+            
+            player.sendSystemMessage(Component.literal("§c§l[GÖREV BAŞLADI] §eBir Somon Balığısın ve etrafındaki tüm sular aniden kuruyor! 2 dakika hayatta kal!"));
+            
+            BlockPos playerPos = player.blockPosition();
+            for (int x = -4; x <= 4; x++) {
+                for (int y = -3; y <= 3; y++) {
+                    for (int z = -4; z <= 4; z++) {
+                        BlockPos targetPos = playerPos.offset(x, y, z);
+                        if (level.getBlockState(targetPos).is(Blocks.WATER)) {
+                            level.setBlock(targetPos, Blocks.AIR.defaultBlockState(), 3);
+                        }
+                    }
+                }
+            }
+            
+        } else if (roll == 1) {
+            activeQuestType = "SHEEP_WOLVES";
+            currentMobForm = "sheep";
+            applyFormRestrictions(player);
+            
+            player.sendSystemMessage(Component.literal("§c§l[GÖREV BAŞLADI] §eBir Koyunsun ve etrafında 10 aç kurt belirdi! Koş ve kaç, 2 dakika hayatta kal!"));
+
+            for (int i = 0; i < 10; i++) {
+                Wolf wolf = EntityType.WOLF.create(level);
+                if (wolf != null) {
+                    double angle = i * (Math.PI * 2 / 10);
+                    double spawnX = player.getX() + (Math.cos(angle) * 6);
+                    double spawnZ = player.getZ() + (Math.sin(angle) * 6);
+                    wolf.setPos(spawnX, player.getY() + 1, spawnZ);
+                    wolf.setAngry(true);
+                    wolf.setTarget(player);
+                    level.addFreshEntity(wolf);
+                }
+            }
+
+        } else {
+            activeQuestType = "PUFFER_WITHER";
+            currentMobForm = "pufferfish";
+            applyFormRestrictions(player);
+            
+            player.sendSystemMessage(Component.literal("§c§l[GÖREV BAŞLADI] §eBir Kirpi Balığısın ve yanına Wither çağrıldı! Patlamalardan 2 dakika kaç!"));
+
+            WitherBoss wither = EntityType.WITHER.create(level);
+            if (wither != null) {
+                wither.setPos(player.getX() + 8, player.getY() + 3, player.getZ() + 8);
+                wither.setTarget(player);
+                level.addFreshEntity(wither);
+            }
+        }
+    }
+
+    public static void completeQuest(ServerPlayer player, boolean success) {
+        if (activeQuestType.equals("NONE")) return;
+
+        if (success) {
+            karmaBar = Math.min(100, karmaBar + 10);
+            player.sendSystemMessage(Component.literal("§a§l[BAŞARDIN!] §eKaostan canlı çıkmayı başardın! §d+10 Karma kazandın."));
+        } else {
+            karmaBar = Math.max(0, karmaBar - 10);
+            player.sendSystemMessage(Component.literal("§c§l[ELENDİN!] §eMücadeleyi kaybettin. §4-10 Karma kaybettin."));
+        }
+
+        activeQuestType = "NONE";
+        questTimer = 0;
+        applyFormRestrictions(player);
+    }
+
+    // --- GENEL MOB ÖZELLİKLERİ VE KISITLAMALAR ---
     public static boolean hasSpecialAbility(String form) {
         form = form.toLowerCase();
         return form.contains("ghast") || form.contains("warden") || form.contains("wither");
@@ -91,7 +206,6 @@ public class MobManager {
         return true;
     }
 
-    // Blok etkileşimi (sol tık blok kırma) menzilleri
     public static double getOriginalMobBlockRange(String form) {
         form = form.toLowerCase();
         if (form.contains("human")) return 4.5D; 
@@ -116,7 +230,6 @@ public class MobManager {
         return 1.0D; 
     }
 
-    // Saldırı menzilleri (ENTITY_REACH)
     private static double getOriginalMobAttackRange(String form) {
         form = form.toLowerCase();
         if (form.contains("human")) return 3.0D; 
@@ -321,21 +434,11 @@ public class MobManager {
         }
     }
 
-    // --- GÜNCELLENDİ: ARTIK HİÇBİR MOB (KÖYLÜ/GEZGİN TÜCCAR HARİÇ) BLOK ETKİLEŞİMİ YAPAMAZ ---
     public static boolean isInteractionRestricted(ServerPlayer player) {
         String form = currentMobForm.toLowerCase();
-        
-        // Eğer oyuncu insan formundaysa hiçbir kısıtlama yok
-        if (form.equals("human")) {
-            return false; 
-        }
-        
-        // Köylü ve Gezgin Tüccar kapıları açabilir/etkileşime girebilir (Kapı açma istisnası)
-        if (form.contains("villager") || form.contains("wandering_trader")) {
-            return false;
-        }
-        
-        return true; // Geri kalan tüm mobların blok kırma, koyma ve sağ tık etkileşimi yasaklanır
+        if (form.equals("human")) return false;
+        if (form.contains("villager") || form.contains("wandering_trader")) return false;
+        return true;
     }
 
     public static boolean canEatFood(String form, String foodItem) {
@@ -345,71 +448,4 @@ public class MobManager {
         if (form.contains("salmon") || form.contains("cod") || form.contains("pufferfish")) {
             return foodItem.contains("kelp") || foodItem.contains("yosun");
         }
-        if (form.contains("villager")) {
-            return foodItem.contains("bread") || foodItem.contains("ekmek");
-        }
-        return true; 
-    }
-
-    private static double getOriginalMobDamage(String form) {
-        if (form.contains("warden")) return 30.0D; 
-        if (form.contains("iron_golem")) return 15.0D; 
-        if (form.contains("wither")) return 8.0D; 
-        
-        if (form.contains("zombie") || form.contains("piglin")) return 3.0D;
-        if (form.contains("spider")) return 2.0D;
-        if (form.contains("silverfish")) return 1.0D;
-
-        return 2.0D; 
-    }
-
-    private static double getOriginalMobHealth(String form) {
-        if (form.contains("warden")) return 500.0D;
-        if (form.contains("iron_golem")) return 100.0D;
-        return 20.0D;
-    }
-
-    public static void applyFormSpawnLocation(ServerPlayer player) {
-        ServerLevel level = (ServerLevel) player.level();
-        String form = currentMobForm.toLowerCase();
-
-        BlockPos spawnPos = player.getRespawnPosition();
-        if (spawnPos == null) {
-            spawnPos = level.getSharedSpawnPos(); 
-        }
-
-        if (form.contains("strider")) {
-            player.teleportTo(level, spawnPos.getX(), level.getSeaLevel(), spawnPos.getZ(), player.getYHeadRot(), player.getXRot());
-        } else {
-            player.teleportTo(level, spawnPos.getX(), spawnPos.getY() + 1, spawnPos.getZ(), player.getYHeadRot(), player.getXRot());
-        }
-    }
-
-    public static String getMobFromExactTier(int karma) {
-        List<String> tierList = getListForTier(karma);
-        return tierList.get(random.nextInt(tierList.size()));
-    }
-
-    public static String getLowerTierEqualShareMob(int currentKarma) {
-        List<String> allLowerMobs = new ArrayList<>();
-        for (int t = 0; t < currentKarma; t += 10) {
-            allLowerMobs.addAll(getListForTier(t));
-        }
-        if (allLowerMobs.isEmpty()) return "frog";
-        return allLowerMobs.get(random.nextInt(allLowerMobs.size()));
-    }
-
-    private static List<String> getListForTier(int karma) {
-        if (karma >= 100) return TIER_100;
-        if (karma >= 90) return TIER_90;
-        if (karma >= 80) return TIER_80;
-        if (karma >= 70) return TIER_70;
-        if (karma >= 60) return TIER_60;
-        if (karma >= 50) return TIER_50;
-        if (karma >= 40) return TIER_40;
-        if (karma >= 30) return TIER_30;
-        if (karma >= 20) return TIER_20;
-        if (karma >= 10) return TIER_10;
-        return TIER_0;
-    }
-}
+        if (form.contains("villag
