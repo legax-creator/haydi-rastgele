@@ -14,6 +14,7 @@ import net.minecraft.world.entity.projectile.WitherSkull;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.common.ForgeMod;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 
@@ -36,25 +37,109 @@ public class MobManager {
     private static final List<String> TIER_90 = Arrays.asList("iron_golem");
     private static final List<String> TIER_100 = Arrays.asList("warden", "wither", "elder_guardian");
 
-    // Formun özel bir yeteneği olup olmadığını kontrol eder
     public static boolean hasSpecialAbility(String form) {
         form = form.toLowerCase();
         return form.contains("ghast") || form.contains("warden") || form.contains("wither");
     }
 
-    // Güç seviyesine göre tick bazında cooldown süresi döner (20 tick = 1 saniye)
     public static int getCooldownTicks(String form) {
         form = form.toLowerCase();
-        if (form.contains("warden")) {
-            return 300; // 15 Saniye Cooldown
+        if (form.contains("warden")) return 300; 
+        if (form.contains("wither")) return 200; 
+        if (form.contains("ghast")) return 120;  
+        return 60;
+    }
+
+    // Mob türüne göre zıplama yüksekliği sınırlamaları
+    public static double getMobJumpStrength(String form) {
+        form = form.toLowerCase();
+        if (form.contains("human")) return 0.42D; 
+
+        if (form.contains("salmon") || form.contains("cod") || form.contains("pufferfish") || form.contains("silverfish") || form.contains("endermite")) {
+            return 0.0D; 
         }
-        if (form.contains("wither")) {
-            return 200; // 10 Saniye Cooldown
+        
+        if (form.contains("rabbit") || form.contains("frog") || form.contains("slime") || form.contains("magma_cube")) {
+            return 0.75D; 
         }
-        if (form.contains("ghast")) {
-            return 120; // 6 Saniye Cooldown
+
+        if (form.contains("warden") || form.contains("iron_golem") || form.contains("cow") || form.contains("pig") || form.contains("sniffer")) {
+            return 0.2D; 
         }
-        return 60; // Varsayılan
+
+        return 0.42D; 
+    }
+
+    // Mob türüne göre koşma (sprinting) izni
+    public static boolean canMobSprint(String form) {
+        form = form.toLowerCase();
+        if (form.contains("human")) return true;
+
+        if (form.contains("salmon") || form.contains("cod") || form.contains("pufferfish") || form.contains("silverfish") || form.contains("sniffer") || form.contains("turtle")) {
+            return false;
+        }
+        return true;
+    }
+
+    // Minecraft'ta fiziksel olarak hasar vuramayan pasif varlıklar
+    public static boolean canMobDealDamage(String form) {
+        form = form.toLowerCase();
+        if (form.contains("chicken") || form.contains("cow") || form.contains("sheep") || form.contains("pig") || 
+            form.contains("rabbit") || form.contains("salmon") || form.contains("cod") || form.contains("squid") || 
+            form.contains("bat") || form.contains("villager") || form.contains("wandering_trader") || 
+            form.contains("frog") || form.contains("strider") || form.contains("horse") || form.contains("donkey") || 
+            form.contains("llama") || form.contains("parrot") || form.contains("sniffer")) {
+            return false; 
+        }
+        return true;
+    }
+
+    // Orijinal Minecraft mob blok kırma mesafeleri (BLOCK_REACH)
+    public static double getOriginalMobBlockRange(String form) {
+        form = form.toLowerCase();
+        if (form.contains("human")) return 4.5D; 
+
+        if (form.contains("warden")) return 3.0D;
+        if (form.contains("iron_golem") || form.contains("ghast") || form.contains("wither") || form.contains("enderman")) {
+            return 2.5D; 
+        }
+
+        if (form.contains("zombie") || form.contains("skeleton") || form.contains("piglin") || form.contains("villager")) {
+            return 2.5D; 
+        }
+
+        if (form.contains("spider") || form.contains("cave_spider")) {
+            return 2.0D;
+        }
+
+        if (form.contains("chicken") || form.contains("rabbit") || form.contains("silverfish") || form.contains("frog")) {
+            return 1.2D; 
+        }
+
+        return 1.0D; 
+    }
+
+    // Orijinal Minecraft mob sol tık fiziksel vuruş mesafeleri (ENTITY_REACH)
+    private static double getOriginalMobAttackRange(String form) {
+        form = form.toLowerCase();
+        if (form.contains("human")) return 3.0D; 
+
+        if (form.contains("warden")) return 3.0D; 
+        if (form.contains("iron_golem")) return 2.5D; 
+        
+        if (form.contains("zombie") || form.contains("skeleton") || form.contains("piglin") || form.contains("enderman")) {
+            return 2.0D; 
+        }
+
+        if (form.contains("spider") || form.contains("cave_spider")) {
+            return 2.0D;
+        }
+
+        if (form.contains("chicken") || form.contains("rabbit") || form.contains("frog") || form.contains("silverfish")) {
+            return 1.0D; 
+        }
+
+        return 0.8D; 
     }
 
     public static void triggerFormAbility(ServerPlayer player) {
@@ -114,11 +199,8 @@ public class MobManager {
 
     private static void giveFormItems(ServerPlayer player, String form) {
         form = form.toLowerCase();
-        
-        // Önce envanterdeki tüm eski yetenek boynuzlarını sıfırla
         player.getInventory().clearOrCountMatchingItems(p -> p.getItem() == Items.GOAT_HORN, -1, player.inventoryMenu.getCraftSlots());
 
-        // Sadece özel yeteneği olan 3 canavara özel keçi boynuzu veriyoruz
         if (hasSpecialAbility(form)) {
             ItemStack horn = new ItemStack(Items.GOAT_HORN);
             String instrument = "minecraft:ponder_goat_horn";
@@ -144,17 +226,33 @@ public class MobManager {
     }
 
     public static void applyFormRestrictions(ServerPlayer player) {
+        String form = currentMobForm.toLowerCase();
+
         if (player.getAttribute(Attributes.JUMP_STRENGTH) != null) {
-            player.getAttribute(Attributes.JUMP_STRENGTH).setBaseValue(0.0D);
+            double jumpPower = getMobJumpStrength(form);
+            player.getAttribute(Attributes.JUMP_STRENGTH).setBaseValue(jumpPower);
         }
+        
         if (player.getAttribute(Attributes.ATTACK_DAMAGE) != null) {
-            double originalDamage = getOriginalMobDamage(currentMobForm.toLowerCase());
+            double originalDamage = canMobDealDamage(form) ? getOriginalMobDamage(form) : 0.0D;
             player.getAttribute(Attributes.ATTACK_DAMAGE).setBaseValue(originalDamage);
         }
+        
         if (player.getAttribute(Attributes.MAX_HEALTH) != null) {
-            double originalHealth = getOriginalMobHealth(currentMobForm.toLowerCase());
+            double originalHealth = getOriginalMobHealth(form);
             player.getAttribute(Attributes.MAX_HEALTH).setBaseValue(originalHealth);
             player.setHealth((float) originalHealth);
+        }
+
+        double blockReach = getOriginalMobBlockRange(form);
+        double entityReach = getOriginalMobAttackRange(form);
+        
+        if (player.getAttribute(ForgeMod.BLOCK_REACH.get()) != null) {
+            player.getAttribute(ForgeMod.BLOCK_REACH.get()).setBaseValue(blockReach);
+        }
+        
+        if (player.getAttribute(ForgeMod.ENTITY_REACH.get()) != null) {
+            player.getAttribute(ForgeMod.ENTITY_REACH.get()).setBaseValue(entityReach);
         }
     }
 
@@ -207,6 +305,13 @@ public class MobManager {
         if (event.getSource().getEntity() instanceof ServerPlayer player) {
             String form = currentMobForm.toLowerCase();
             LivingEntity target = event.getEntity();
+            
+            if (!canMobDealDamage(form)) {
+                event.setCanceled(true);
+                player.sendSystemMessage(Component.literal("§c[!] Bir " + form + " olarak fiziksel hasar veremezsiniz!"));
+                return;
+            }
+
             double distance = player.distanceTo(target);
             double maxRange = getOriginalMobAttackRange(form);
 
@@ -244,6 +349,11 @@ public class MobManager {
         if (form.contains("warden")) return 30.0D; 
         if (form.contains("iron_golem")) return 15.0D; 
         if (form.contains("wither")) return 8.0D; 
+        
+        if (form.contains("zombie") || form.contains("piglin")) return 3.0D;
+        if (form.contains("spider")) return 2.0D;
+        if (form.contains("silverfish")) return 1.0D;
+
         return 2.0D; 
     }
 
@@ -253,15 +363,8 @@ public class MobManager {
         return 20.0D;
     }
 
-    private static double getOriginalMobAttackRange(String form) {
-        if (form.contains("iron_golem")) return 2.0D; 
-        if (form.contains("warden")) return 4.5D; 
-        return 2.5D; 
-    }
-
     public static void applyFormSpawnLocation(ServerPlayer player) {
         ServerLevel level = (ServerLevel) player.level();
-        BlockPos pos = player.blockPosition();
         String form = currentMobForm.toLowerCase();
 
         BlockPos spawnPos = player.getRespawnPosition();
