@@ -26,7 +26,13 @@ public class GameEvents {
     @SubscribeEvent
     public static void onPlayerDeath(LivingDeathEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
-            MobManager.handlePlayerDeath(player);
+            // Eğer aktif bir kaos görevi varken öldüyse görevi başarısız say (-10 Karma)
+            if (!MobManager.activeQuestType.equals("NONE")) {
+                MobManager.completeQuest(player, false);
+            } else {
+                // Normal ölüm cezası (-20 Karma)
+                MobManager.handlePlayerDeath(player);
+            }
         }
     }
 
@@ -42,13 +48,16 @@ public class GameEvents {
         if (event.getEntity() instanceof ServerPlayer player) {
             String form = MobManager.currentMobForm.toLowerCase();
             
+            // Koşma engeli kontrolü
             if (player.isSprinting() && !MobManager.canMobSprint(form)) {
                 player.setSprinting(false);
             }
+
+            // --- GÖREV DÖNGÜSÜ tetikleniyor ---
+            MobManager.tickQuest(player);
         }
     }
 
-    // --- GÜNCELLENDİ: BLOK KIRMA ENGELİ ---
     @SubscribeEvent
     public static void onBlockBreak(BlockEvent.BreakEvent event) {
         Player player = event.getPlayer();
@@ -60,7 +69,6 @@ public class GameEvents {
         }
     }
 
-    // --- GÜNCELLENDİ: BLOK KOYMA ENGELİ ---
     @SubscribeEvent
     public static void onBlockPlace(BlockEvent.EntityPlaceEvent event) {
         if (event.getEntity() instanceof ServerPlayer serverPlayer) {
@@ -71,7 +79,6 @@ public class GameEvents {
         }
     }
 
-    // --- GÜNCELLENDİ: BLOK SAĞ TIK ETKİLEŞİM ENGELİ (Sandık, Kapı vb.) ---
     @SubscribeEvent
     public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
         if (event.getEntity() instanceof ServerPlayer serverPlayer) {
