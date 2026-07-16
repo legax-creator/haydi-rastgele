@@ -126,7 +126,9 @@ public class GameEvents {
                 float height = MobManager.getMobHeight(form);
                 float eyeHeight = MobManager.getMobEyeHeight(form);
                 
-                event.setNewSize(net.minecraft.world.entity.EntityDimensions.scalable(width, height), eyeHeight);
+                // 1.20.1 için ayrılmış boyutlandırma ve göz yüksekliği metotları
+                event.setNewSize(net.minecraft.world.entity.EntityDimensions.scalable(width, height));
+                event.setNewEyeHeight(eyeHeight);
             }
         }
     }
