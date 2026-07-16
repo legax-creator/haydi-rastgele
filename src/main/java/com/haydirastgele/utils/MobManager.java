@@ -10,6 +10,9 @@ import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.projectile.LargeFireball;
+import net.minecraft.world.entity.projectile.WitherSkull;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
@@ -33,25 +36,51 @@ public class MobManager {
     private static final List<String> TIER_90 = Arrays.asList("iron_golem");
     private static final List<String> TIER_100 = Arrays.asList("warden", "wither", "elder_guardian");
 
+    // Formun özel bir yeteneği olup olmadığını kontrol eder
+    public static boolean hasSpecialAbility(String form) {
+        form = form.toLowerCase();
+        return form.contains("ghast") || form.contains("warden") || form.contains("wither");
+    }
+
+    // Güç seviyesine göre tick bazında cooldown süresi döner (20 tick = 1 saniye)
+    public static int getCooldownTicks(String form) {
+        form = form.toLowerCase();
+        if (form.contains("warden")) {
+            return 300; // 15 Saniye Cooldown
+        }
+        if (form.contains("wither")) {
+            return 200; // 10 Saniye Cooldown
+        }
+        if (form.contains("ghast")) {
+            return 120; // 6 Saniye Cooldown
+        }
+        return 60; // Varsayılan
+    }
+
     public static void triggerFormAbility(ServerPlayer player) {
         String form = currentMobForm.toLowerCase();
         ServerLevel level = (ServerLevel) player.level();
+        Vec3 look = player.getLookAngle();
 
         if (form.contains("ghast")) {
-            Vec3 look = player.getLookAngle();
             LargeFireball fireball = new LargeFireball(level, player, look.x, look.y, look.z, 1);
             fireball.setPos(player.getX(), player.getEyeY(), player.getZ());
             level.addFreshEntity(fireball);
-            player.sendSystemMessage(Component.literal("§c[!] Ateş topu fırlattınız!"));
+            player.sendSystemMessage(Component.literal("§c[!] Dev Güç: Büyük ateş topu fırlatıldı!"));
+            
+        } else if (form.contains("wither")) {
+            WitherSkull skull = new WitherSkull(level, player, look.x, look.y, look.z);
+            skull.setPos(player.getX(), player.getEyeY(), player.getZ());
+            level.addFreshEntity(skull);
+            player.sendSystemMessage(Component.literal("§8[!] Kara Güç: Wither kafatası fırlatıldı!"));
+            
         } else if (form.contains("warden")) {
-            player.level().getEntitiesOfClass(LivingEntity.class, player.getBoundingBox().inflate(10.0D)).forEach(entity -> {
+            player.level().getEntitiesOfClass(LivingEntity.class, player.getBoundingBox().inflate(12.0D)).forEach(entity -> {
                 if (entity != player) {
-                    entity.hurt(player.damageSources().sonicBoom(player), 20.0F);
+                    entity.hurt(player.damageSources().sonicBoom(player), 25.0F);
                 }
             });
-            player.sendSystemMessage(Component.literal("§4[!] Sonik Patlama gerçekleşti!"));
-        } else {
-            player.sendSystemMessage(Component.literal("§e[!] Bu formun özel bir yeteneği yok."));
+            player.sendSystemMessage(Component.literal("§4[!] Kadim Güç: Sonik çığlık etraftaki her şeyi sarstı!"));
         }
     }
 
@@ -59,7 +88,6 @@ public class MobManager {
         String mob = currentMobForm.toLowerCase();
         if (!(mob.contains("slime") || mob.contains("magma_cube"))) {
             karmaBar = Math.max(0, karmaBar - 20);
-            assignNewMob(player);
         }
     }
 
@@ -79,9 +107,40 @@ public class MobManager {
             player.sendSystemMessage(Component.literal("§d[!] Şans eseri bebek formunda doğdunuz!"));
         }
         applyFormRestrictions(player);
+        giveFormItems(player, chosen);
         
-        // Boyut güncellenmesi için Minecraft motorunu tetikliyoruz
         player.refreshDimensions();
+    }
+
+    private static void giveFormItems(ServerPlayer player, String form) {
+        form = form.toLowerCase();
+        
+        // Önce envanterdeki tüm eski yetenek boynuzlarını sıfırla
+        player.getInventory().clearOrCountMatchingItems(p -> p.getItem() == Items.GOAT_HORN, -1, player.inventoryMenu.getCraftSlots());
+
+        // Sadece özel yeteneği olan 3 canavara özel keçi boynuzu veriyoruz
+        if (hasSpecialAbility(form)) {
+            ItemStack horn = new ItemStack(Items.GOAT_HORN);
+            String instrument = "minecraft:ponder_goat_horn";
+            String customName = "§eÖzel Yetenek";
+
+            if (form.contains("warden")) {
+                instrument = "minecraft:sing_goat_horn";
+                customName = "§4[KADİM] Warden Çığlığı";
+            } else if (form.contains("wither")) {
+                instrument = "minecraft:yearn_goat_horn";
+                customName = "§8[BELA] Wither Tahribatı";
+            } else if (form.contains("ghast")) {
+                instrument = "minecraft:seek_goat_horn";
+                customName = "§c[YIKIM] Ghast Patlaması";
+            }
+
+            horn.getOrCreateTag().putString("instrument", instrument);
+            horn.setHoverName(Component.literal(customName));
+            
+            player.getInventory().add(horn);
+            player.sendSystemMessage(Component.literal("§a[!] Güçlü bir canavara dönüştünüz! " + customName + " envanterinize eklendi."));
+        }
     }
 
     public static void applyFormRestrictions(ServerPlayer player) {
@@ -106,7 +165,7 @@ public class MobManager {
         if (form.contains("spider")) return 1.4F;
         if (form.contains("chicken") || form.contains("rabbit")) return 0.4F;
         if (form.contains("silverfish") || form.contains("endermite")) return 0.4F;
-        return 0.6F; // İnsan/Standart
+        return 0.6F;
     }
 
     public static float getMobHeight(String form) {
@@ -117,7 +176,7 @@ public class MobManager {
         if (form.contains("chicken")) return 0.7F;
         if (form.contains("rabbit")) return 0.5F;
         if (form.contains("silverfish")) return 0.3F;
-        return 1.8F; // İnsan/Standart
+        return 1.8F;
     }
 
     public static float getMobEyeHeight(String form) {
@@ -126,7 +185,7 @@ public class MobManager {
         if (form.contains("iron_golem")) return 2.25F;
         if (form.contains("enderman")) return 2.55F;
         if (form.contains("chicken")) return 0.5F;
-        return 1.62F; // İnsan/Standart
+        return 1.62F;
     }
 
     public static void handleInteract(PlayerInteractEvent.EntityInteract event) {
@@ -137,14 +196,6 @@ public class MobManager {
                 if (event.getEntity() instanceof ServerPlayer rider && rider != targetPlayer) {
                     rider.startRiding(targetPlayer);
                     rider.sendSystemMessage(Component.literal("§a[!] Oyuncunun sırtına bindiniz!"));
-                    event.setCancellationResult(InteractionResult.SUCCESS);
-                    event.setCanceled(true);
-                }
-            }
-            
-            if (targetForm.contains("villager") || targetForm.contains("wandering_trader")) {
-                if (event.getEntity() instanceof ServerPlayer customer && customer != targetPlayer) {
-                    customer.sendSystemMessage(Component.literal("§6[!] " + targetPlayer.getName().getString() + " ile otomatik takas arayüzü açılıyor..."));
                     event.setCancellationResult(InteractionResult.SUCCESS);
                     event.setCanceled(true);
                 }
@@ -168,17 +219,6 @@ public class MobManager {
         }
     }
 
-    public static boolean shouldMobIgnorePlayer(LivingEntity mob, ServerPlayer player) {
-        String form = currentMobForm.toLowerCase();
-        String mobName = mob.getType().getDescriptionId().toLowerCase();
-        
-        if ((form.contains("villager") || form.contains("cow") || form.contains("sheep") || form.contains("pig")) 
-            && (mobName.contains("cow") || mobName.contains("sheep") || mobName.contains("pig"))) {
-            return true;
-        }
-        return false;
-    }
-
     public static boolean isInteractionRestricted(ServerPlayer player) {
         String form = currentMobForm.toLowerCase();
         if (form.contains("villager") || form.contains("wandering_trader")) {
@@ -191,77 +231,31 @@ public class MobManager {
         form = form.toLowerCase();
         foodItem = foodItem.toLowerCase();
         
-        if (form.contains("salmon") || form.contains("cod") || form.contains("pufferfish") || form.contains("elder_guardian")) {
+        if (form.contains("salmon") || form.contains("cod") || form.contains("pufferfish")) {
             return foodItem.contains("kelp") || foodItem.contains("yosun");
         }
-        if (form.contains("villager") || form.contains("wandering_trader")) {
+        if (form.contains("villager")) {
             return foodItem.contains("bread") || foodItem.contains("ekmek");
         }
-        if (form.contains("strider")) {
-            return foodItem.contains("crimson_roots") || foodItem.contains("sarmaşık");
-        }
-        if (form.contains("frog")) {
-            return foodItem.contains("fish") || foodItem.contains("balık");
-        }
-        if (form.contains("silverfish")) {
-            return foodItem.contains("stone") || foodItem.contains("taş");
-        }
-        if (form.contains("horse") || form.contains("donkey")) {
-            return foodItem.contains("carrot") || foodItem.contains("apple") || foodItem.contains("elma");
-        }
-        if (form.contains("parrot") || form.contains("chicken")) {
-            return foodItem.contains("seeds") || foodItem.contains("tohum");
-        }
-        if (form.contains("bat") || form.contains("bee")) {
-            return foodItem.contains("flower") || foodItem.contains("Çimen");
-        }
-        if (form.contains("hoglin") || form.contains("zombified_piglin") || form.contains("piglin")) {
-            return foodItem.contains("carrot") || foodItem.contains("havuç");
-        }
-        if (form.contains("zombie") || form.contains("skeleton") || form.contains("wither_skeleton")) {
-            return foodItem.contains("meat") || foodItem.contains("et");
-        }
-        if (form.contains("spider")) {
-            return foodItem.contains("string") || foodItem.contains("ip");
-        }
-        if (form.contains("enderman")) {
-            return foodItem.contains("warped_fungus");
-        }
-        if (form.contains("iron_golem")) {
-            return foodItem.contains("iron") || foodItem.contains("demir");
-        }
-        if (form.contains("sniffer")) {
-            return foodItem.contains("torchflower") || foodItem.contains("tohum");
-        }
-        
-        return false;
+        return true; 
     }
 
     private static double getOriginalMobDamage(String form) {
         if (form.contains("warden")) return 30.0D; 
         if (form.contains("iron_golem")) return 15.0D; 
         if (form.contains("wither")) return 8.0D; 
-        if (form.contains("hoglin")) return 6.0D; 
-        if (form.contains("enderman")) return 7.0D;
-        if (form.contains("zombie") || form.contains("spider")) return 3.0D;
-        if (form.contains("skeleton")) return 4.0D;
         return 2.0D; 
     }
 
     private static double getOriginalMobHealth(String form) {
         if (form.contains("warden")) return 500.0D;
         if (form.contains("iron_golem")) return 100.0D;
-        if (form.contains("wither")) return 300.0D;
-        if (form.contains("zombie") || form.contains("skeleton")) return 20.0D;
         return 20.0D;
     }
 
     private static double getOriginalMobAttackRange(String form) {
         if (form.contains("iron_golem")) return 2.0D; 
         if (form.contains("warden")) return 4.5D; 
-        if (form.contains("ghast") || form.contains("wither")) return 15.0D; 
-        if (form.contains("spider") || form.contains("cave_spider")) return 3.0D; 
-        if (form.contains("hoglin") || form.contains("zombie") || form.contains("skeleton")) return 3.0D;
         return 2.5D; 
     }
 
@@ -270,10 +264,15 @@ public class MobManager {
         BlockPos pos = player.blockPosition();
         String form = currentMobForm.toLowerCase();
 
-        if (form.contains("strider") || form.contains("hoglin") || form.contains("piglin")) {
-            player.teleportTo(level, pos.getX(), level.getSeaLevel(), pos.getZ(), player.getYHeadRot(), player.getXRot());
-        } else if (form.contains("phantom") && level.isDay()) {
-            player.sendSystemMessage(Component.literal("§c[!] Güneş altındasınız, hareket hızınız sınırlandı!"));
+        BlockPos spawnPos = player.getRespawnPosition();
+        if (spawnPos == null) {
+            spawnPos = level.getSharedSpawnPos(); 
+        }
+
+        if (form.contains("strider")) {
+            player.teleportTo(level, spawnPos.getX(), level.getSeaLevel(), spawnPos.getZ(), player.getYHeadRot(), player.getXRot());
+        } else {
+            player.teleportTo(level, spawnPos.getX(), spawnPos.getY() + 1, spawnPos.getZ(), player.getYHeadRot(), player.getXRot());
         }
     }
 
@@ -304,4 +303,4 @@ public class MobManager {
         if (karma >= 10) return TIER_10;
         return TIER_0;
     }
-            }
+}
