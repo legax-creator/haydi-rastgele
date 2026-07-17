@@ -417,7 +417,7 @@ public class MobManager {
         if (form.contains("iron_golem")) return 2.25F;
         if (form.contains("enderman")) return 2.55F;
         if (form.contains(
-    lic static void handleLivingHurt(LivingHurtEvent event) {
+    public static void handleLivingHurt(LivingHurtEvent event) {
         if (event.getSource().getEntity() instanceof ServerPlayer player) {
             String form = currentMobForm.toLowerCase();
             LivingEntity target = event.getEntity();
