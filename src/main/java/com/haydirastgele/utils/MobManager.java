@@ -36,7 +36,7 @@ public class MobManager {
     public static String currentMobForm = "human";
     private static final Random random = new Random();
 
-    // Evrim ve adaptasyon sayaçları (Biyom ve Suda kalma takibi için)
+    // Evrim ve adaptasyon sayaçları
     private static final Map<UUID, Integer> waterTicks = new HashMap<>();
     private static final Map<UUID, Integer> desertTicks = new HashMap<>();
     private static final Map<UUID, Integer> snowTicks = new HashMap<>();
@@ -149,21 +149,18 @@ public class MobManager {
         applyFormRestrictions(player);
     }
 
-    // --- OYUNCU ÖLÜMÜNDEN TETİKLENEN METOT ---
     public static void handlePlayerDeath(ServerPlayer player) {
         if (!activeQuestType.equals("NONE")) {
             completeQuest(player, false);
         }
     }
 
-    // --- GLOBAL KISITLAMALAR VE TICK MOTORU ---
     public static void applyGlobalFormRestrictions(ServerPlayer player) {
         String form = currentMobForm.toLowerCase();
         UUID uuid = player.getUUID();
         ServerLevel level = player.serverLevel();
         BlockPos pos = player.blockPosition();
 
-        // 1. ZIPLAMA YASAĞI VE STEP ASSIST (Setter metodu ile düzeltildi)
         if (!form.contains("rabbit")) {
             player.setMaxUpStep(1.25F);
             if (player.getAttribute(Attributes.JUMP_STRENGTH) != null) {
@@ -176,7 +173,6 @@ public class MobManager {
             }
         }
 
-        // Örümceklerin duvara tırmanma mekaniği
         if (form.contains("spider") || form.contains("cave_spider")) {
             if (player.horizontalCollision) {
                 Vec3 motion = player.getDeltaMovement();
@@ -184,7 +180,6 @@ public class MobManager {
             }
         }
 
-        // 3. ENVANTER LOCKER MECHANIC & BARRIER LOCK
         for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
             if (i != 0 && i != 1 && i != 9) {
                 ItemStack stack = player.getInventory().getItem(i);
@@ -194,7 +189,6 @@ public class MobManager {
             }
         }
 
-        // 4. ÇEVRE ETKİLEŞİMLERİ VE EVRİMLER
         if (form.contains("salmon") || form.contains("cod") || form.contains("pufferfish")) {
             if (!player.isInWater()) {
                 player.setAirSupply(player.getAirSupply() - 1);
@@ -220,7 +214,6 @@ public class MobManager {
             player.hurt(level.damageSources().magic(), 1.0F);
         }
 
-        // ZOMBİ EVRİMLERİ
         if (form.equals("zombie")) {
             if (player.isInWater()) {
                 waterTicks.put(uuid, waterTicks.getOrDefault(uuid, 0) + 1);
@@ -241,7 +234,6 @@ public class MobManager {
             }
         }
 
-        // İSKELET -> STRAY EVRİMİ
         if (form.equals("skeleton") && level.getBiome(pos).unwrapKey().map(key -> key.location().getPath()).orElse("").contains("snow")) {
             snowTicks.put(uuid, snowTicks.getOrDefault(uuid, 0) + 1);
             if (snowTicks.get(uuid) > 1200) {
@@ -257,9 +249,8 @@ public class MobManager {
         form = form.toLowerCase();
         return form.contains("ghast") || form.contains("warden") || form.contains("wither") || 
                form.contains("enderman") || form.contains("llama") || form.contains("snow_golem") || form.contains("pufferfish");
-    }
-
-    public static void triggerFormAbility(ServerPlayer player) {
+                        }
+        public static void triggerFormAbility(ServerPlayer player) {
         String form = currentMobForm.toLowerCase();
         ServerLevel level = (ServerLevel) player.level();
         Vec3 look = player.getLookAngle();
@@ -284,7 +275,6 @@ public class MobManager {
                 player.getCooldowns().addCooldown(Items.GOAT_HORN, 200);
             }
         } else if (form.contains("llama")) {
-            // Lama tükürüğü kurucusu düzeltildi
             LlamaSpit spit = new LlamaSpit(EntityType.LLAMA_SPIT, level);
             spit.setOwner(player);
             spit.shoot(look.x, look.y, look.z, 1.5F, 1.0F);
@@ -416,7 +406,45 @@ public class MobManager {
         if (form.contains("warden")) return 2.6F;
         if (form.contains("iron_golem")) return 2.25F;
         if (form.contains("enderman")) return 2.55F;
-        if (form.contains(
+        if (form.contains("chicken")) return 0.5F;
+        return 1.62F;
+    }
+
+    public static void handleInteract(PlayerInteractEvent.EntityInteract event) {
+        Player player = event.getEntity();
+        String form = currentMobForm.toLowerCase();
+
+        if (form.contains("frog") && event.getTarget().getType() == EntityType.MAGMA_CUBE) {
+            event.getTarget().discard();
+            player.getFoodData().setFoodLevel(20);
+            player.sendSystemMessage(Component.literal("§a[!] Magma Küpü yiyerek açlığını fulledin!"));
+            event.setCancellationResult(InteractionResult.SUCCESS);
+            event.setCanceled(true);
+            return;
+        }
+
+        if (form.contains("elder_guardian") && player.getMainHandItem().is(Items.GOAT_HORN)) {
+            if (event.getTarget() instanceof LivingEntity targetEntity) {
+                if (!targetEntity.hasEffect(MobEffects.DIG_SLOWDOWN)) {
+                    targetEntity.addEffect(new MobEffectInstance(MobEffects.DIG_SLOWDOWN, 1200, 2));
+                    player.sendSystemMessage(Component.literal("§7[!] Hedefe Madenci Yorgunluğu verildi."));
+                }
+            }
+            event.setCanceled(true);
+            return;
+        }
+
+        if (event.getTarget() instanceof ServerPlayer targetPlayer) {
+            if (form.contains("horse") || form.contains("donkey") || form.contains("camel") || form.contains("strider")) {
+                if (event.getEntity() instanceof ServerPlayer rider && rider != targetPlayer) {
+                    rider.startRiding(targetPlayer);
+                    event.setCancellationResult(InteractionResult.SUCCESS);
+                    event.setCanceled(true);
+                }
+            }
+        }
+    }
+
     public static void handleLivingHurt(LivingHurtEvent event) {
         if (event.getSource().getEntity() instanceof ServerPlayer player) {
             String form = currentMobForm.toLowerCase();
@@ -501,7 +529,7 @@ public class MobManager {
         form = form.toLowerCase();
         if (form.contains("human")) return 3.0D; 
         if (form.contains("warden")) return 3.0D; 
-        if (form.contains("iron_golem")) return 2.5D; // İstediğin gibi 2.5 blokta kaldı
+        if (form.contains("iron_golem")) return 2.5D; 
         if (form.contains("zombie") || form.contains("skeleton") || form.contains("piglin") || form.contains("enderman")) return 2.0D; 
         if (form.contains("spider") || form.contains("cave_spider")) return 2.0D;
         if (form.contains("chicken") || form.contains("rabbit") || form.contains("frog") || form.contains("silverfish")) return 1.0D;
