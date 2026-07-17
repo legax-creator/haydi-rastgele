@@ -27,6 +27,7 @@ import net.minecraftforge.common.ForgeMod;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
+import net.minecraft.world.entity.player.Player;
 
 import java.util.*;
 
@@ -148,23 +149,23 @@ public class MobManager {
         applyFormRestrictions(player);
     }
 
-    // --- EN YENİ KISITLAMALAR VE TICK MOTORU ---
+    // --- GLOBAL KISITLAMALAR VE TICK MOTORU ---
     public static void applyGlobalFormRestrictions(ServerPlayer player) {
         String form = currentMobForm.toLowerCase();
         UUID uuid = player.getUUID();
         ServerLevel level = player.serverLevel();
         BlockPos pos = player.blockPosition();
 
-        // 1. ZIPLAMA YASAĞI (Tavşan hariç zıplayamazlar, otomatik zıplama basamak desteği gelir)
+        // 1. ZIPLAMA YASAĞI VE STEP ASSIST
         if (!form.contains("rabbit")) {
-            player.maxUpStep = 1.25F; // Otomatik blok tırmanma step assist
+            player.maxUpStep = 1.25F;
             if (player.getAttribute(Attributes.JUMP_STRENGTH) != null) {
-                player.getAttribute(Attributes.JUMP_STRENGTH).setBaseValue(0.0D); // Manuel zıplama gücünü sıfırla
+                player.getAttribute(Attributes.JUMP_STRENGTH).setBaseValue(0.0D);
             }
         } else {
             player.maxUpStep = 0.6F;
             if (player.getAttribute(Attributes.JUMP_STRENGTH) != null) {
-                player.getAttribute(Attributes.JUMP_STRENGTH).setBaseValue(0.75D); // Tavşan orijinal zıplaması
+                player.getAttribute(Attributes.JUMP_STRENGTH).setBaseValue(0.75D);
             }
         }
 
@@ -172,13 +173,13 @@ public class MobManager {
         if (form.contains("spider") || form.contains("cave_spider")) {
             if (player.horizontalCollision) {
                 Vec3 motion = player.getDeltaMovement();
-                player.setDeltaMovement(motion.x, 0.15D, motion.z); // Duvara tırmandır
+                player.setDeltaMovement(motion.x, 0.15D, motion.z);
             }
         }
 
         // 3. ENVANTER LOCKER MECHANIC & BARRIER LOCK
         for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
-            if (i != 0 && i != 1 && i != 9) { // Sağ el (0), sol el (1) ve iskelet oku (9) hariç her yer kilitli
+            if (i != 0 && i != 1 && i != 9) {
                 ItemStack stack = player.getInventory().getItem(i);
                 if (stack.getItem() != Items.BARRIER) {
                     player.getInventory().setItem(i, new ItemStack(Blocks.BARRIER));
@@ -212,7 +213,7 @@ public class MobManager {
             player.hurt(level.damageSources().magic(), 1.0F);
         }
 
-        // ZOMBİ -> BOĞUK / HUSK EVRİMİ
+        // ZOMBİ EVRİMLERİ
         if (form.equals("zombie")) {
             if (player.isInWater()) {
                 waterTicks.put(uuid, waterTicks.getOrDefault(uuid, 0) + 1);
@@ -268,46 +269,30 @@ public class MobManager {
             player.level().getEntitiesOfClass(LivingEntity.class, player.getBoundingBox().inflate(12.0D)).forEach(entity -> {
                 if (entity != player) entity.hurt(player.damageSources().sonicBoom(player), 25.0F);
             });
-        } 
-        // ENDERMAN IŞINLANMA MECHANIC
-        else if (form.contains("enderman")) {
+        } else if (form.contains("enderman")) {
             HitResult hit = player.pick(20.0D, 0.0F, false);
             if (hit.getType() == HitResult.Type.BLOCK) {
                 BlockPos targetPos = ((BlockHitResult) hit).getBlockPos().above();
                 player.teleportTo(targetPos.getX(), targetPos.getY(), targetPos.getZ());
-                player.getCooldowns().addCooldown(Items.GOAT_HORN, 200); // 10 saniye cooldown
+                player.getCooldowns().addCooldown(Items.GOAT_HORN, 200);
             }
-        }
-        // LAMA TÜKÜRÜK MECHANIC
-        else if (form.contains("llama")) {
+        } else if (form.contains("llama")) {
             LlamaSpit spit = new LlamaSpit(level, player);
             spit.shootFromRotation(player, player.getXRot(), player.getYRot(), 0.0F, 1.5F, 1.0F);
             level.addFreshEntity(spit);
-            player.getCooldowns().addCooldown(Items.GOAT_HORN, 20); // 1 saniye cooldown
-        }
-        // KAR GOLEMİ KARTOPU MECHANIC
-        else if (form.contains("snow_golem")) {
+            player.getCooldowns().addCooldown(Items.GOAT_HORN, 20);
+        } else if (form.contains("snow_golem")) {
             Snowball snowball = new Snowball(level, player);
             snowball.shootFromRotation(player, player.getXRot(), player.getYRot(), 0.0F, 1.5F, 1.0F);
             level.addFreshEntity(snowball);
-            player.getCooldowns().addCooldown(Items.GOAT_HORN, 20); // 1 saniye cooldown
-        }
-        // KİRPİ BALIĞI ŞİŞME MECHANIC
-        else if (form.contains("pufferfish")) {
+            player.getCooldowns().addCooldown(Items.GOAT_HORN, 20);
+        } else if (form.contains("pufferfish")) {
             player.addEffect(new MobEffectInstance(MobEffects.POISON, 60, 1));
             level.getEntitiesOfClass(LivingEntity.class, player.getBoundingBox().inflate(3.0D)).forEach(entity -> {
                 if (entity != player) entity.hurt(level.damageSources().magic(), 4.0F);
             });
-            player.getCooldowns().addCooldown(Items.GOAT_HORN, 120); // 6 saniye cooldown
+            player.getCooldowns().addCooldown(Items.GOAT_HORN, 120);
         }
-    }
-
-    public static void handlePlayerDeath(ServerPlayer player) {
-        // Ölüm sonrası karma cezası silindi, direkt olarak havuzdan yeniden zar atma eventine yönlendirildi.
-    }
-
-    public static void handlePlayerResultOnDeath(ServerPlayer player) {
-        // Ölüm durumunda form korunmaz, mevcut karma seviyesinden tamamen rastgele yeni bir zar atılır.
     }
 
     public static void handlePlayerRespawn(ServerPlayer player) {
@@ -331,7 +316,6 @@ public class MobManager {
         form = form.toLowerCase();
         player.getInventory().clearContent();
 
-        // İskelet / Kutup İskeleti varyant başlangıç eşyaları
         if (form.contains("skeleton") && !form.contains("wither")) {
             ItemStack bow = new ItemStack(Items.BOW);
             bow.enchant(Enchantments.INFINITY_ARROWS, 1);
@@ -341,7 +325,6 @@ public class MobManager {
             player.getInventory().setItem(0, new ItemStack(Items.STONE_SWORD));
         }
 
-        // Keçi Boynuzu gerektiren yetenekler için otomatik boynuz verme
         if (hasSpecialAbility(form)) {
             ItemStack horn = new ItemStack(Items.GOAT_HORN);
             horn.setHoverName(Component.literal("§e[YETENEK] Keçi Boynuzu"));
@@ -349,10 +332,16 @@ public class MobManager {
         }
     }
 
+    public static boolean canMobDealDamage(String form) {
+        form = form.toLowerCase();
+        return !form.contains("chicken") && !form.contains("cow") && !form.contains("sheep") && 
+               !form.contains("pig") && !form.contains("rabbit") && !form.contains("salmon") && 
+               !form.contains("cod") && !form.contains("villager") && !form.contains("bat");
+    }
+
     public static void applyFormRestrictions(ServerPlayer player) {
         String form = currentMobForm.toLowerCase();
 
-        // Uçan varlıklar için mayfly/flying izni tetiklemesi
         if (form.contains("bat") || form.contains("phantom") || form.contains("ghast") || form.contains("wither")) {
             player.getAbilities().mayfly = true;
         } else {
@@ -360,7 +349,6 @@ public class MobManager {
             player.getAbilities().flying = false;
         }
 
-        // Tavuk formunda süzülme ve yavaş düşüş efekti
         if (form.contains("chicken")) {
             player.addEffect(new MobEffectInstance(MobEffects.SLOW_FALLING, Integer.MAX_VALUE, 0, false, false));
         } else {
@@ -400,7 +388,7 @@ public class MobManager {
         return 0.6F;
     }
 
-        public static float getMobHeight(String form) {
+    public static float getMobHeight(String form) {
         form = form.toLowerCase();
         if (form.contains("ghast")) return 4.0F;
         if (form.contains("warden")) return 2.9F;
@@ -412,28 +400,7 @@ public class MobManager {
         return 1.8F;
     }
 
-            }
-    }
-
-    // Köylü kapı/sandık açabilir, diğer moblar açamaz engeli
-    public static boolean isBlockInteractionRestricted(ServerPlayer player, BlockPos pos) {
-        String form = currentMobForm.toLowerCase();
-        if (form.equals("human") || form.contains("villager") || form.contains("wandering_trader")) {
-            return false;
-        }
-        net.minecraft.world.level.block.state.BlockState state = player.level().getBlockState(pos);
-        return state.is(Blocks.CHEST) || state.is(Blocks.TRAPPED_CHEST) || state.is(Blocks.BARREL) || 
-               state.getBlock() instanceof net.minecraft.world.level.block.DoorBlock || 
-               state.getBlock() instanceof net.minecraft.world.level.block.TrapDoorBlock;
-    }
-
-    public static boolean isInteractionRestricted(ServerPlayer player) {
-        String form = currentMobForm.toLowerCase();
-        if (form.equals("human")) return false;
-        if (form.contains("villager") || form.contains("wandering_trader")) return false;
-        return true;
-    }
-public static float getMobEyeHeight(String form) {
+    public static float getMobEyeHeight(String form) {
         form = form.toLowerCase();
         if (form.contains("ghast")) return 2.0F;
         if (form.contains("warden")) return 2.6F;
@@ -447,7 +414,6 @@ public static float getMobEyeHeight(String form) {
         Player player = event.getEntity();
         String form = currentMobForm.toLowerCase();
 
-        // KURBAĞA MAGMA KÜPÜ YEME MEKANİĞİ
         if (form.contains("frog") && event.getTarget().getType() == EntityType.MAGMA_CUBE) {
             event.getTarget().discard();
             player.getFoodData().setFoodLevel(20);
@@ -457,7 +423,6 @@ public static float getMobEyeHeight(String form) {
             return;
         }
 
-        // YAŞLI GARDİYAN MADENCİ YORGUNLUĞU VERME
         if (form.contains("elder_guardian") && player.getMainHandItem().is(Items.GOAT_HORN)) {
             if (event.getTarget() instanceof LivingEntity targetEntity) {
                 if (!targetEntity.hasEffect(MobEffects.DIG_SLOWDOWN)) {
@@ -480,31 +445,27 @@ public static float getMobEyeHeight(String form) {
         }
     }
 
-    // ARTIK HASAR VE ÖZEL VURUŞ EFEKTLERİ BURADA İŞLENİYOR
     public static void handleLivingHurt(LivingHurtEvent event) {
         if (event.getSource().getEntity() instanceof ServerPlayer player) {
             String form = currentMobForm.toLowerCase();
             LivingEntity target = event.getEntity();
 
-            // WITHER İSKELETİ & WITHER VURUŞ EFEKTLERİ
             if (form.contains("wither_skeleton") || form.equals("wither")) {
                 target.addEffect(new MobEffectInstance(MobEffects.WITHER, 200, 1));
             }
 
-            // MAĞARA ÖRÜMCEĞİ %30 İHTİMALLE ZEHİR
             if (form.contains("cave_spider") && random.nextInt(100) < 30) {
                 target.addEffect(new MobEffectInstance(MobEffects.POISON, 140, 0));
             }
 
-            // ARI SOKMA CEZASI: "Kararlılığına Can Feda" Başarımı ve "Bunu Neden Yaptım?" Erimesi (10 dk)
             if (form.contains("bee")) {
-                player.addEffect(new MobEffectInstance(MobEffects.WITHER, 12000, 0)); // 10 dakika (12000 tick) yavaş erime
+                player.addEffect(new MobEffectInstance(MobEffects.WITHER, 12000, 0));
                 player.sendSystemMessage(Component.literal("§c[!] Birini soktun! 'Bunu Neden Yaptım?' efekti başladı. 10 dakika içinde öleceksin."));
             }
         }
     }
 
-        public static void handleAttack(LivingAttackEvent event) {
+    public static void handleAttack(LivingAttackEvent event) {
         if (event.getSource().getEntity() instanceof ServerPlayer player) {
             String form = currentMobForm.toLowerCase();
             LivingEntity target = event.getEntity();
@@ -523,7 +484,6 @@ public static float getMobEyeHeight(String form) {
         }
     }
 
-    // Köylü kapı/sandık açabilir, diğer moblar açamaz engeli
     public static boolean isBlockInteractionRestricted(ServerPlayer player, BlockPos pos) {
         String form = currentMobForm.toLowerCase();
         if (form.equals("human") || form.contains("villager") || form.contains("wandering_trader")) {
@@ -576,6 +536,13 @@ public static float getMobEyeHeight(String form) {
         return 0.8D; 
     }
 
+    private static double getOriginalMobBlockRange(String form) {
+        form = form.toLowerCase();
+        if (form.contains("human") || form.contains("villager")) return 4.5D;
+        if (form.contains("warden") || form.contains("iron_golem") || form.contains("enderman")) return 4.0D;
+        return 3.0D;
+    }
+
     private static double getOriginalMobHealth(String form) {
         form = form.toLowerCase();
         if (form.contains("warden")) return 500.0D;
@@ -613,7 +580,7 @@ public static float getMobEyeHeight(String form) {
         return allLowerMobs.get(random.nextInt(allLowerMobs.size()));
     }
 
-    private static List<String> getListForTier(int karma) {
+        private static List<String> getListForTier(int karma) {
         if (karma >= 100) return TIER_100;
         if (karma >= 90) return TIER_90;
         if (karma >= 80) return TIER_80;
