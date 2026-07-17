@@ -149,6 +149,13 @@ public class MobManager {
         applyFormRestrictions(player);
     }
 
+    // --- OYUNCU ÖLÜMÜNDEN TETİKLENEN METOT ---
+    public static void handlePlayerDeath(ServerPlayer player) {
+        if (!activeQuestType.equals("NONE")) {
+            completeQuest(player, false);
+        }
+    }
+
     // --- GLOBAL KISITLAMALAR VE TICK MOTORU ---
     public static void applyGlobalFormRestrictions(ServerPlayer player) {
         String form = currentMobForm.toLowerCase();
@@ -156,14 +163,14 @@ public class MobManager {
         ServerLevel level = player.serverLevel();
         BlockPos pos = player.blockPosition();
 
-        // 1. ZIPLAMA YASAĞI VE STEP ASSIST
+        // 1. ZIPLAMA YASAĞI VE STEP ASSIST (Setter metodu ile düzeltildi)
         if (!form.contains("rabbit")) {
-            player.maxUpStep = 1.25F;
+            player.setMaxUpStep(1.25F);
             if (player.getAttribute(Attributes.JUMP_STRENGTH) != null) {
                 player.getAttribute(Attributes.JUMP_STRENGTH).setBaseValue(0.0D);
             }
         } else {
-            player.maxUpStep = 0.6F;
+            player.setMaxUpStep(0.6F);
             if (player.getAttribute(Attributes.JUMP_STRENGTH) != null) {
                 player.getAttribute(Attributes.JUMP_STRENGTH).setBaseValue(0.75D);
             }
@@ -277,8 +284,11 @@ public class MobManager {
                 player.getCooldowns().addCooldown(Items.GOAT_HORN, 200);
             }
         } else if (form.contains("llama")) {
-            LlamaSpit spit = new LlamaSpit(level, player);
-            spit.shootFromRotation(player, player.getXRot(), player.getYRot(), 0.0F, 1.5F, 1.0F);
+            // Lama tükürüğü kurucusu düzeltildi
+            LlamaSpit spit = new LlamaSpit(EntityType.LLAMA_SPIT, level);
+            spit.setOwner(player);
+            spit.shoot(look.x, look.y, look.z, 1.5F, 1.0F);
+            spit.setPos(player.getX(), player.getEyeY(), player.getZ());
             level.addFreshEntity(spit);
             player.getCooldowns().addCooldown(Items.GOAT_HORN, 20);
         } else if (form.contains("snow_golem")) {
@@ -406,46 +416,8 @@ public class MobManager {
         if (form.contains("warden")) return 2.6F;
         if (form.contains("iron_golem")) return 2.25F;
         if (form.contains("enderman")) return 2.55F;
-        if (form.contains("chicken")) return 0.5F;
-        return 1.62F;
-    }
-
-    public static void handleInteract(PlayerInteractEvent.EntityInteract event) {
-        Player player = event.getEntity();
-        String form = currentMobForm.toLowerCase();
-
-        if (form.contains("frog") && event.getTarget().getType() == EntityType.MAGMA_CUBE) {
-            event.getTarget().discard();
-            player.getFoodData().setFoodLevel(20);
-            player.sendSystemMessage(Component.literal("§a[!] Magma Küpü yiyerek açlığını fulledin!"));
-            event.setCancellationResult(InteractionResult.SUCCESS);
-            event.setCanceled(true);
-            return;
-        }
-
-        if (form.contains("elder_guardian") && player.getMainHandItem().is(Items.GOAT_HORN)) {
-            if (event.getTarget() instanceof LivingEntity targetEntity) {
-                if (!targetEntity.hasEffect(MobEffects.DIG_SLOWDOWN)) {
-                    targetEntity.addEffect(new MobEffectInstance(MobEffects.DIG_SLOWDOWN, 1200, 2));
-                    player.sendSystemMessage(Component.literal("§7[!] Hedefe Madenci Yorgunluğu verildi."));
-                }
-            }
-            event.setCanceled(true);
-            return;
-        }
-
-        if (event.getTarget() instanceof ServerPlayer targetPlayer) {
-            if (form.contains("horse") || form.contains("donkey") || form.contains("camel") || form.contains("strider")) {
-                if (event.getEntity() instanceof ServerPlayer rider && rider != targetPlayer) {
-                    rider.startRiding(targetPlayer);
-                    event.setCancellationResult(InteractionResult.SUCCESS);
-                    event.setCanceled(true);
-                }
-            }
-        }
-    }
-
-    public static void handleLivingHurt(LivingHurtEvent event) {
+        if (form.contains(
+    lic static void handleLivingHurt(LivingHurtEvent event) {
         if (event.getSource().getEntity() instanceof ServerPlayer player) {
             String form = currentMobForm.toLowerCase();
             LivingEntity target = event.getEntity();
@@ -529,7 +501,7 @@ public class MobManager {
         form = form.toLowerCase();
         if (form.contains("human")) return 3.0D; 
         if (form.contains("warden")) return 3.0D; 
-        if (form.contains("iron_golem")) return 2.5D; 
+        if (form.contains("iron_golem")) return 2.5D; // İstediğin gibi 2.5 blokta kaldı
         if (form.contains("zombie") || form.contains("skeleton") || form.contains("piglin") || form.contains("enderman")) return 2.0D; 
         if (form.contains("spider") || form.contains("cave_spider")) return 2.0D;
         if (form.contains("chicken") || form.contains("rabbit") || form.contains("frog") || form.contains("silverfish")) return 1.0D;
@@ -580,7 +552,7 @@ public class MobManager {
         return allLowerMobs.get(random.nextInt(allLowerMobs.size()));
     }
 
-        private static List<String> getListForTier(int karma) {
+    private static List<String> getListForTier(int karma) {
         if (karma >= 100) return TIER_100;
         if (karma >= 90) return TIER_90;
         if (karma >= 80) return TIER_80;
