@@ -52,6 +52,7 @@ public class MobManager {
     public static int nextQuestTriggerTicks = random.nextInt(36000); 
     private static int timeSinceLastQuestTicks = 0;
 
+    // Birebir Senin İstediğin Liste
     private static final List<String> TIER_0 = Arrays.asList("salmon", "cod", "villager", "strider", "frog");
     private static final List<String> TIER_10 = Arrays.asList("pufferfish", "silverfish", "horse", "donkey", "parrot", "sniffer", "wandering_trader", "bat", "bee");
     private static final List<String> TIER_20 = Arrays.asList("hoglin", "zombified_piglin", "piglin", "llama");
@@ -178,7 +179,6 @@ public class MobManager {
         ServerLevel level = player.serverLevel();
         BlockPos pos = player.blockPosition();
 
-        // Güneş Yanığı Mekaniği
         if ((form.contains("skeleton") || form.equals("zombie") || form.equals("husk")) && level.isDay() && level.canSeeSky(pos)) {
             player.setSecondsOnFire(8);
         }
@@ -202,7 +202,6 @@ public class MobManager {
             }
         }
 
-        // Akıllı Envanter Yönetimi (Yiyecekler, Yay ve Ok Korunur)
         if (!form.equals("human")) {
             for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
                 if (i != 0 && i != 1 && i != 9) {
@@ -381,7 +380,6 @@ public class MobManager {
     public static void applyFormRestrictions(ServerPlayer player) {
         String form = currentMobForm.toLowerCase();
 
-        // Uçuş Güncellemesi
         if (form.contains("bat") || form.contains("phantom") || form.contains("ghast") || form.contains("wither")) {
             player.getAbilities().mayfly = true;
         } else {
@@ -401,7 +399,6 @@ public class MobManager {
             player.getAttribute(Attributes.ATTACK_DAMAGE).setBaseValue(originalDamage);
         }
         
-        // Can Güncellemesi ve Senkronizasyonu
         if (player.getAttribute(Attributes.MAX_HEALTH) != null) {
             double originalHealth = getOriginalMobHealth(form);
             player.getAttribute(Attributes.MAX_HEALTH).setBaseValue(originalHealth);
@@ -418,7 +415,6 @@ public class MobManager {
             player.getAttribute(ForgeMod.ENTITY_REACH.get()).setBaseValue(entityReach);
         }
 
-        // Boyutu Tetikleyen Kod
         player.refreshDimensions();
     }
 
@@ -510,6 +506,6 @@ public class MobManager {
     }
 
     private static void applyFormSpawnLocation(ServerPlayer player) {
-        // Doğma lokasyon algoritması ihtiyaca göre buraya eklenebilir.
-    }
-}
+        // İhtiyaca göre doğma konumu mantığı eklenebilir.
+     }
+  }     
