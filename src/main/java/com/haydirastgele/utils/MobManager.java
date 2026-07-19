@@ -48,7 +48,8 @@ public class MobManager {
     // --- KAOS GÖREV SİSTEMİ DEĞİŞKENLERİ ---
     public static String activeQuestType = "NONE"; 
     public static int questTimer = 0; 
-    public static int nextQuestTriggerTicks = random.nextInt(36000); 
+    // [GÜNCELLENDİ] 15 dakika içinde rastgele tetiklenme (15 dk = 18000 tick)
+    public static int nextQuestTriggerTicks = random.nextInt(18000); 
     private static int timeSinceLastQuestTicks = 0;
 
     private static final List<String> TIER_0 = Arrays.asList("salmon", "cod", "villager", "strider", "frog");
@@ -80,7 +81,8 @@ public class MobManager {
             if (timeSinceLastQuestTicks >= nextQuestTriggerTicks) {
                 startRandomKaosQuest(player);
                 timeSinceLastQuestTicks = 0;
-                nextQuestTriggerTicks = random.nextInt(36000); 
+                // [GÜNCELLENDİ] Bir sonraki görev yine 15 dk içinde rastgele ayarlanır
+                nextQuestTriggerTicks = random.nextInt(18000); 
             }
         } else {
             if (player.tickCount % 20 == 0) {
@@ -150,14 +152,15 @@ public class MobManager {
         }
     }
 
+    // [GÜNCELLENDİ] Ölüm durumunda artık 10 yerine sadece 5 karma eksilecek
     public static void completeQuest(ServerPlayer player, boolean success) {
         if (activeQuestType.equals("NONE")) return;
         if (success) {
             karmaBar = Math.min(100, karmaBar + 10);
             player.sendSystemMessage(Component.literal("§a§l[BAŞARDIN!] §eKaostan canlı çıkmayı başardın! §d+10 Karma kazandın."));
         } else {
-            karmaBar = Math.max(0, karmaBar - 10);
-            player.sendSystemMessage(Component.literal("§c§l[ELENDİN!] §eMücadeleyi kaybettin. §4-10 Karma kaybettin."));
+            karmaBar = Math.max(0, karmaBar - 5);
+            player.sendSystemMessage(Component.literal("§c§l[ELENDİN!] §eMücadeleyi kaybettin. §4-5 Karma kaybettin."));
         }
         activeQuestType = "NONE";
         questTimer = 0;
@@ -219,7 +222,6 @@ public class MobManager {
             }
         }
 
-        // --- Orijinal Eşya İsimlerine Göre Güncellenmiş Envanter Kontrolü ---
         if (!form.equals("human")) {
             for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
                 if (i != 0 && i != 1 && i != 9) {
@@ -239,7 +241,6 @@ public class MobManager {
                         if (form.contains("snow_golem") && (stack.getItem() == Items.SNOWBALL || stack.getItem() == Blocks.ICE.asItem() || stack.getItem() == Blocks.PACKED_ICE.asItem() || stack.getItem() == Blocks.BLUE_ICE.asItem())) {
                             allowed = true;
                         }
-                        // Orijinal isimler kullanıldı: Items.BEEF, Items.CHICKEN, Items.PORKCHOP, Items.MUTTON
                         if ((form.contains("zombie") || form.equals("husk") || form.equals("drowned")) && (stack.getItem() == Items.ROTTEN_FLESH || stack.getItem() == Items.BEEF || stack.getItem() == Items.CHICKEN || stack.getItem() == Items.PORKCHOP || stack.getItem() == Items.MUTTON)) {
                             allowed = true;
                         }
@@ -467,7 +468,6 @@ public class MobManager {
         return true; 
     }
 
-    // Orijinal eşya kimlikleri göz önüne alınarak kontrol yapıları güncellendi
     public static boolean canEatFood(String form, String foodName) {
         form = form.toLowerCase();
         foodName = foodName.toLowerCase();
@@ -481,7 +481,6 @@ public class MobManager {
         if (form.contains("chicken")) {
             return foodName.contains("seed");
         }
-        // Zombi ve örümcekler için "beef", "chicken", "porkchop", "mutton" kontrolleri eklendi
         if (form.contains("zombie") || form.equals("husk") || form.equals("drowned")) {
             return foodName.contains("rotten") || foodName.contains("beef") || foodName.contains("chicken") || foodName.contains("pork") || foodName.contains("mutton");
         }
