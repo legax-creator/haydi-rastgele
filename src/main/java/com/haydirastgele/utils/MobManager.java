@@ -45,10 +45,17 @@ public class MobManager {
     private static final Map<UUID, Integer> desertTicks = new HashMap<>();
     private static final Map<UUID, Integer> snowTicks = new HashMap<>();
 
+    // --- GÖREV MÜZİKLERİ KAYITLARI ---
+    public static final net.minecraft.sounds.SoundEvent MUSIC_SALMON = net.minecraft.sounds.SoundEvent.createVariableRangeEvent(
+            new net.minecraft.resources.ResourceLocation("haydirastgele", "salmon_quest_music"));
+    public static final net.minecraft.sounds.SoundEvent MUSIC_SHEEP = net.minecraft.sounds.SoundEvent.createVariableRangeEvent(
+            new net.minecraft.resources.ResourceLocation("haydirastgele", "sheep_quest_music"));
+    public static final net.minecraft.sounds.SoundEvent MUSIC_WITHER = net.minecraft.sounds.SoundEvent.createVariableRangeEvent(
+            new net.minecraft.resources.ResourceLocation("haydirastgele", "wither_quest_music"));
+
     // --- KAOS GÖREV SİSTEMİ DEĞİŞKENLERİ ---
     public static String activeQuestType = "NONE"; 
     public static int questTimer = 0; 
-    // [GÜNCELLENDİ] 15 dakika içinde rastgele tetiklenme (15 dk = 18000 tick)
     public static int nextQuestTriggerTicks = random.nextInt(18000); 
     private static int timeSinceLastQuestTicks = 0;
 
@@ -81,7 +88,6 @@ public class MobManager {
             if (timeSinceLastQuestTicks >= nextQuestTriggerTicks) {
                 startRandomKaosQuest(player);
                 timeSinceLastQuestTicks = 0;
-                // [GÜNCELLENDİ] Bir sonraki görev yine 15 dk içinde rastgele ayarlanır
                 nextQuestTriggerTicks = random.nextInt(18000); 
             }
         } else {
@@ -108,6 +114,9 @@ public class MobManager {
             applyFormRestrictions(player);
             player.sendSystemMessage(Component.literal("§c§l[GÖREV BAŞLADI] §eBir Somon Balığısın ve etrafındaki tüm sular aniden kuruyor! 2 dakika hayatta kal!"));
             
+            level.playSound(null, player.getX(), player.getY(), player.getZ(), 
+                    MUSIC_SALMON, net.minecraft.sounds.SoundSource.MUSIC, 1.0F, 1.0F);
+
             BlockPos playerPos = player.blockPosition();
             for (int x = -4; x <= 4; x++) {
                 for (int y = -3; y <= 3; y++) {
@@ -124,6 +133,9 @@ public class MobManager {
             currentMobForm = "sheep";
             applyFormRestrictions(player);
             player.sendSystemMessage(Component.literal("§c§l[GÖREV BAŞLADI] §eBir Koyunsun ve etrafında 10 aç kurt belirdi! Koş ve kaç, 2 dakika hayatta kal!"));
+
+            level.playSound(null, player.getX(), player.getY(), player.getZ(), 
+                    MUSIC_SHEEP, net.minecraft.sounds.SoundSource.MUSIC, 1.0F, 1.0F);
 
             for (int i = 0; i < 10; i++) {
                 Wolf wolf = EntityType.WOLF.create(level);
@@ -143,6 +155,9 @@ public class MobManager {
             applyFormRestrictions(player);
             player.sendSystemMessage(Component.literal("§c§l[GÖREV BAŞLADI] §eBir Kirpi Balığısın ve yanına Wither çağrıldı! Patlamalardan 2 dakika kaç!"));
 
+            level.playSound(null, player.getX(), player.getY(), player.getZ(), 
+                    MUSIC_WITHER, net.minecraft.sounds.SoundSource.MUSIC, 1.0F, 1.0F);
+
             WitherBoss wither = EntityType.WITHER.create(level);
             if (wither != null) {
                 wither.setPos(player.getX() + 8, player.getY() + 3, player.getZ() + 8);
@@ -152,7 +167,6 @@ public class MobManager {
         }
     }
 
-    // [GÜNCELLENDİ] Ölüm durumunda artık 10 yerine sadece 5 karma eksilecek
     public static void completeQuest(ServerPlayer player, boolean success) {
         if (activeQuestType.equals("NONE")) return;
         if (success) {
@@ -172,8 +186,7 @@ public class MobManager {
             completeQuest(player, false);
         }
     }
-
-    public static void applyGlobalFormRestrictions(ServerPlayer player) {
+        public static void applyGlobalFormRestrictions(ServerPlayer player) {
         String form = currentMobForm.toLowerCase();
         UUID uuid = player.getUUID();
         ServerLevel level = player.serverLevel();
@@ -326,7 +339,8 @@ public class MobManager {
             }
         }
     }
-        public static boolean hasSpecialAbility(String form) {
+    
+    public static boolean hasSpecialAbility(String form) {
         form = form.toLowerCase();
         return form.contains("ghast") || form.contains("warden") || form.contains("wither") || 
                form.contains("enderman") || form.contains("llama") || form.contains("snow_golem") || form.contains("pufferfish");
@@ -570,7 +584,7 @@ public class MobManager {
             player.getAbilities().flying = false;
             player.getAbilities().setFlyingSpeed(0.05F); 
         }
-        player.onUpdateAbilities();
+        player.getAbilities();
 
         if (form.contains("chicken")) {
             player.addEffect(new MobEffectInstance(MobEffects.SLOW_FALLING, Integer.MAX_VALUE, 0, false, false));
