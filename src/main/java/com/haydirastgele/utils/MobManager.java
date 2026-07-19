@@ -28,9 +28,14 @@ import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraft.world.entity.player.Player;
+import net.minecraftforge.event.entity.EntityEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraft.world.entity.EntityDimensions;
 
 import java.util.*;
 
+@Mod.EventBusSubscriber(bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class MobManager {
     public static int karmaBar = 50;
     public static String currentMobForm = "human";
@@ -58,6 +63,18 @@ public class MobManager {
     private static final List<String> TIER_80 = Arrays.asList("enderman");
     private static final List<String> TIER_90 = Arrays.asList("iron_golem");
     private static final List<String> TIER_100 = Arrays.asList("warden", "wither", "elder_guardian");
+
+    // Hitbox ve Boyut Değişim Event'i
+    @SubscribeEvent
+    public static void onPlayerSize(EntityEvent.Size event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            String form = currentMobForm.toLowerCase();
+            float w = getMobWidth(form);
+            float h = getMobHeight(form);
+            event.setNewSize(EntityDimensions.fixed(w, h));
+            event.setNewEyeHeight(getMobEyeHeight(form));
+        }
+    }
 
     public static void tickQuest(ServerPlayer player) {
         if (activeQuestType.equals("NONE")) {
@@ -161,6 +178,11 @@ public class MobManager {
         ServerLevel level = player.serverLevel();
         BlockPos pos = player.blockPosition();
 
+        // Güneş Yanığı Mekaniği
+        if ((form.contains("skeleton") || form.equals("zombie") || form.equals("husk")) && level.isDay() && level.canSeeSky(pos)) {
+            player.setSecondsOnFire(8);
+        }
+
         if (!form.contains("rabbit")) {
             player.setMaxUpStep(1.25F);
             if (player.getAttribute(Attributes.JUMP_STRENGTH) != null) {
@@ -180,11 +202,16 @@ public class MobManager {
             }
         }
 
-        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
-            if (i != 0 && i != 1 && i != 9) {
-                ItemStack stack = player.getInventory().getItem(i);
-                if (stack.getItem() != Items.BARRIER) {
-                    player.getInventory().setItem(i, new ItemStack(Blocks.BARRIER));
+        // Akıllı Envanter Yönetimi (Yiyecekler, Yay ve Ok Korunur)
+        if (!form.equals("human")) {
+            for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+                if (i != 0 && i != 1 && i != 9) {
+                    ItemStack stack = player.getInventory().getItem(i);
+                    if (!stack.isEmpty() && stack.getItem() != Items.BARRIER) {
+                        if (!stack.isEdible() && !(form.contains("skeleton") && (stack.getItem() == Items.BOW || stack.getItem() == Items.ARROW))) {
+                            player.getInventory().setItem(i, new ItemStack(Items.BARRIER));
+                        }
+                    }
                 }
             }
         }
@@ -244,13 +271,13 @@ public class MobManager {
             }
         }
     }
-
-    public static boolean hasSpecialAbility(String form) {
+        public static boolean hasSpecialAbility(String form) {
         form = form.toLowerCase();
         return form.contains("ghast") || form.contains("warden") || form.contains("wither") || 
                form.contains("enderman") || form.contains("llama") || form.contains("snow_golem") || form.contains("pufferfish");
-                        }
-        public static void triggerFormAbility(ServerPlayer player) {
+    }
+
+    public static void triggerFormAbility(ServerPlayer player) {
         String form = currentMobForm.toLowerCase();
         ServerLevel level = (ServerLevel) player.level();
         Vec3 look = player.getLookAngle();
@@ -292,6 +319,18 @@ public class MobManager {
                 if (entity != player) entity.hurt(level.damageSources().magic(), 4.0F);
             });
             player.getCooldowns().addCooldown(Items.GOAT_HORN, 120);
+        }
+    }
+
+    public static void handlePlayerInteract(PlayerInteractEvent.EntityInteract event) {
+        Player player = event.getEntity();
+        String form = currentMobForm.toLowerCase();
+
+        if (form.contains("frog") && event.getTarget().getType() == EntityType.MAGMA_CUBE) {
+            event.getTarget().discard();
+            player.getFoodData().setFoodLevel(player.getFoodData().getFoodLevel() + 2);
+            event.setCancellationResult(InteractionResult.SUCCESS);
+            event.setCanceled(true);
         }
     }
 
@@ -342,12 +381,14 @@ public class MobManager {
     public static void applyFormRestrictions(ServerPlayer player) {
         String form = currentMobForm.toLowerCase();
 
+        // Uçuş Güncellemesi
         if (form.contains("bat") || form.contains("phantom") || form.contains("ghast") || form.contains("wither")) {
             player.getAbilities().mayfly = true;
         } else {
             player.getAbilities().mayfly = false;
             player.getAbilities().flying = false;
         }
+        player.onUpdateAbilities();
 
         if (form.contains("chicken")) {
             player.addEffect(new MobEffectInstance(MobEffects.SLOW_FALLING, Integer.MAX_VALUE, 0, false, false));
@@ -360,6 +401,7 @@ public class MobManager {
             player.getAttribute(Attributes.ATTACK_DAMAGE).setBaseValue(originalDamage);
         }
         
+        // Can Güncellemesi ve Senkronizasyonu
         if (player.getAttribute(Attributes.MAX_HEALTH) != null) {
             double originalHealth = getOriginalMobHealth(form);
             player.getAttribute(Attributes.MAX_HEALTH).setBaseValue(originalHealth);
@@ -375,8 +417,12 @@ public class MobManager {
         if (player.getAttribute(ForgeMod.ENTITY_REACH.get()) != null) {
             player.getAttribute(ForgeMod.ENTITY_REACH.get()).setBaseValue(entityReach);
         }
+
+        // Boyutu Tetikleyen Kod
+        player.refreshDimensions();
     }
 
+    // --- BOYUT METOTLARI ---
     public static float getMobWidth(String form) {
         form = form.toLowerCase();
         if (form.contains("ghast")) return 4.0F;
@@ -385,6 +431,7 @@ public class MobManager {
         if (form.contains("spider") || form.contains("cave_spider")) return 1.4F;
         if (form.contains("chicken") || form.contains("rabbit") || form.contains("salmon") || form.contains("cod")) return 0.4F;
         if (form.contains("silverfish")) return 0.4F;
+        if (form.contains("pig")) return 0.6F;
         return 0.6F;
     }
 
@@ -397,6 +444,7 @@ public class MobManager {
         if (form.contains("chicken")) return 0.7F;
         if (form.contains("rabbit")) return 0.5F;
         if (form.contains("silverfish") || form.contains("salmon") || form.contains("cod")) return 0.3F;
+        if (form.contains("pig") || form.contains("spider") || form.contains("cave_spider")) return 0.9F;
         return 1.8F;
     }
 
@@ -407,180 +455,47 @@ public class MobManager {
         if (form.contains("iron_golem")) return 2.25F;
         if (form.contains("enderman")) return 2.55F;
         if (form.contains("chicken")) return 0.5F;
+        if (form.contains("pig")) return 0.8F;
         return 1.62F;
     }
 
-    public static void handleInteract(PlayerInteractEvent.EntityInteract event) {
-        Player player = event.getEntity();
-        String form = currentMobForm.toLowerCase();
-
-        if (form.contains("frog") && event.getTarget().getType() == EntityType.MAGMA_CUBE) {
-            event.getTarget().discard();
-            player.getFoodData().setFoodLevel(20);
-            player.sendSystemMessage(Component.literal("§a[!] Magma Küpü yiyerek açlığını fulledin!"));
-            event.setCancellationResult(InteractionResult.SUCCESS);
-            event.setCanceled(true);
-            return;
-        }
-
-        if (form.contains("elder_guardian") && player.getMainHandItem().is(Items.GOAT_HORN)) {
-            if (event.getTarget() instanceof LivingEntity targetEntity) {
-                if (!targetEntity.hasEffect(MobEffects.DIG_SLOWDOWN)) {
-                    targetEntity.addEffect(new MobEffectInstance(MobEffects.DIG_SLOWDOWN, 1200, 2));
-                    player.sendSystemMessage(Component.literal("§7[!] Hedefe Madenci Yorgunluğu verildi."));
-                }
-            }
-            event.setCanceled(true);
-            return;
-        }
-
-        if (event.getTarget() instanceof ServerPlayer targetPlayer) {
-            if (form.contains("horse") || form.contains("donkey") || form.contains("camel") || form.contains("strider")) {
-                if (event.getEntity() instanceof ServerPlayer rider && rider != targetPlayer) {
-                    rider.startRiding(targetPlayer);
-                    event.setCancellationResult(InteractionResult.SUCCESS);
-                    event.setCanceled(true);
-                }
-            }
-        }
-    }
-
-    public static void handleLivingHurt(LivingHurtEvent event) {
-        if (event.getSource().getEntity() instanceof ServerPlayer player) {
-            String form = currentMobForm.toLowerCase();
-            LivingEntity target = event.getEntity();
-
-            if (form.contains("wither_skeleton") || form.equals("wither")) {
-                target.addEffect(new MobEffectInstance(MobEffects.WITHER, 200, 1));
-            }
-
-            if (form.contains("cave_spider") && random.nextInt(100) < 30) {
-                target.addEffect(new MobEffectInstance(MobEffects.POISON, 140, 0));
-            }
-
-            if (form.contains("bee")) {
-                player.addEffect(new MobEffectInstance(MobEffects.WITHER, 12000, 0));
-                player.sendSystemMessage(Component.literal("§c[!] Birini soktun! 'Bunu Neden Yaptım?' efekti başladı. 10 dakika içinde öleceksin."));
-            }
-        }
-    }
-
-    public static void handleAttack(LivingAttackEvent event) {
-        if (event.getSource().getEntity() instanceof ServerPlayer player) {
-            String form = currentMobForm.toLowerCase();
-            LivingEntity target = event.getEntity();
-            
-            if (!canMobDealDamage(form)) {
-                event.setCanceled(true);
-                return;
-            }
-
-            double distance = player.distanceTo(target);
-            double maxRange = getOriginalMobAttackRange(form);
-
-            if (distance > maxRange) {
-                event.setCanceled(true);
-            }
-        }
-    }
-
-    public static boolean isBlockInteractionRestricted(ServerPlayer player, BlockPos pos) {
-        String form = currentMobForm.toLowerCase();
-        if (form.equals("human") || form.contains("villager") || form.contains("wandering_trader")) {
-            return false;
-        }
-        net.minecraft.world.level.block.state.BlockState state = player.level().getBlockState(pos);
-        return state.is(Blocks.CHEST) || state.is(Blocks.TRAPPED_CHEST) || state.is(Blocks.BARREL) || 
-               state.getBlock() instanceof net.minecraft.world.level.block.DoorBlock || 
-               state.getBlock() instanceof net.minecraft.world.level.block.TrapDoorBlock;
-    }
-
-    public static boolean isInteractionRestricted(ServerPlayer player) {
-        String form = currentMobForm.toLowerCase();
-        if (form.equals("human")) return false;
-        if (form.contains("villager") || form.contains("wandering_trader")) return false;
-        return true;
-    }
-
-    public static boolean canEatFood(String form, String foodItem) {
-        form = form.toLowerCase();
-        foodItem = foodItem.toLowerCase();
-        if (form.contains("salmon") || form.contains("cod") || form.contains("pufferfish")) {
-            return foodItem.contains("kelp") || foodItem.contains("seagrass");
-        }
-        if (form.contains("villager")) {
-            return foodItem.contains("bread") || foodItem.contains("apple");
-        }
-        return true; 
-    }
-
-    private static double getOriginalMobDamage(String form) {
-        form = form.toLowerCase();
-        if (form.contains("warden")) return 30.0D; 
-        if (form.contains("iron_golem")) return 15.0D; 
-        if (form.contains("wither")) return 8.0D; 
-        if (form.contains("zombie") || form.contains("piglin") || form.contains("husk") || form.contains("drowned")) return 3.0D;
-        if (form.contains("spider") || form.contains("cave_spider")) return 2.0D;
-        if (form.contains("silverfish")) return 1.0D;
-        return 2.0D; 
-    }
-
-    private static double getOriginalMobAttackRange(String form) {
-        form = form.toLowerCase();
-        if (form.contains("human")) return 3.0D; 
-        if (form.contains("warden")) return 3.0D; 
-        if (form.contains("iron_golem")) return 2.5D; 
-        if (form.contains("zombie") || form.contains("skeleton") || form.contains("piglin") || form.contains("enderman")) return 2.0D; 
-        if (form.contains("spider") || form.contains("cave_spider")) return 2.0D;
-        if (form.contains("chicken") || form.contains("rabbit") || form.contains("frog") || form.contains("silverfish")) return 1.0D;
-        return 0.8D; 
-    }
-
-    private static double getOriginalMobBlockRange(String form) {
-        form = form.toLowerCase();
-        if (form.contains("human") || form.contains("villager")) return 4.5D;
-        if (form.contains("warden") || form.contains("iron_golem") || form.contains("enderman")) return 4.0D;
-        return 3.0D;
-    }
-
+    // --- YARDIMCI METOTLAR VE UYUMLULUK KATMANI ---
     private static double getOriginalMobHealth(String form) {
-        form = form.toLowerCase();
         if (form.contains("warden")) return 500.0D;
+        if (form.contains("wither")) return 300.0D;
         if (form.contains("iron_golem")) return 100.0D;
-        if (form.contains("wither") && !form.contains("skeleton")) return 300.0D;
         if (form.contains("elder_guardian")) return 80.0D;
-        if (form.contains("enderman")) return 40.0D;
+        if (form.contains("pig") || form.contains("chicken") || form.contains("salmon") || form.contains("cod") || form.contains("rabbit")) return 10.0D;
         return 20.0D;
     }
 
-    public static void applyFormSpawnLocation(ServerPlayer player) {
-        ServerLevel level = (ServerLevel) player.level();
-        String form = currentMobForm.toLowerCase();
-        BlockPos spawnPos = player.getRespawnPosition();
-        if (spawnPos == null) spawnPos = level.getSharedSpawnPos(); 
-
-        if (form.contains("strider")) {
-            player.teleportTo(level, spawnPos.getX(), level.getSeaLevel(), spawnPos.getZ(), player.getYHeadRot(), player.getXRot());
-        } else {
-            player.teleportTo(level, spawnPos.getX(), spawnPos.getY() + 1, spawnPos.getZ(), player.getYHeadRot(), player.getXRot());
-        }
+    private static double getOriginalMobDamage(String form) {
+        if (form.contains("warden")) return 30.0D;
+        if (form.contains("iron_golem")) return 15.0D;
+        if (form.contains("wither_skeleton") || form.contains("spider")) return 4.0D;
+        return 2.0D;
     }
 
-    public static String getMobFromExactTier(int karma) {
-        List<String> tierList = getListForTier(karma);
-        return tierList.get(random.nextInt(tierList.size()));
+    private static double getOriginalMobBlockRange(String form) { 
+        return 4.5D; 
+    }
+    
+    private static double getOriginalMobAttackRange(String form) { 
+        return 3.0D; 
     }
 
-    public static String getLowerTierEqualShareMob(int currentKarma) {
-        List<String> allLowerMobs = new ArrayList<>();
-        for (int t = 0; t < currentKarma; t += 10) {
-            allLowerMobs.addAll(getListForTier(t));
-        }
-        if (allLowerMobs.isEmpty()) return "frog";
-        return allLowerMobs.get(random.nextInt(allLowerMobs.size()));
+    private static String getMobFromExactTier(int karma) {
+        List<String> pool = getTierPool(karma);
+        return pool.get(random.nextInt(pool.size()));
     }
 
-    private static List<String> getListForTier(int karma) {
+    private static String getLowerTierEqualShareMob(int karma) {
+        int targetKarma = Math.max(0, karma - 10);
+        List<String> pool = getTierPool(targetKarma);
+        return pool.get(random.nextInt(pool.size()));
+    }
+
+    private static List<String> getTierPool(int karma) {
         if (karma >= 100) return TIER_100;
         if (karma >= 90) return TIER_90;
         if (karma >= 80) return TIER_80;
@@ -592,5 +507,9 @@ public class MobManager {
         if (karma >= 20) return TIER_20;
         if (karma >= 10) return TIER_10;
         return TIER_0;
+    }
+
+    private static void applyFormSpawnLocation(ServerPlayer player) {
+        // Doğma lokasyon algoritması ihtiyaca göre buraya eklenebilir.
     }
 }
