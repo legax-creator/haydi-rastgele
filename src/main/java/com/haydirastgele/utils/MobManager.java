@@ -52,7 +52,7 @@ public class MobManager {
     public static int nextQuestTriggerTicks = random.nextInt(36000); 
     private static int timeSinceLastQuestTicks = 0;
 
-    // Birebir Senin İstediğin Liste
+    // Senin orijinal listen
     private static final List<String> TIER_0 = Arrays.asList("salmon", "cod", "villager", "strider", "frog");
     private static final List<String> TIER_10 = Arrays.asList("pufferfish", "silverfish", "horse", "donkey", "parrot", "sniffer", "wandering_trader", "bat", "bee");
     private static final List<String> TIER_20 = Arrays.asList("hoglin", "zombified_piglin", "piglin", "llama");
@@ -321,7 +321,9 @@ public class MobManager {
         }
     }
 
-    public static void handlePlayerInteract(PlayerInteractEvent.EntityInteract event) {
+    // [DÜZELTİLDİ] İsmi GameEvents'in aradığı gibi "handleInteract" yapıldı
+    @SubscribeEvent
+    public static void handleInteract(PlayerInteractEvent.EntityInteract event) {
         Player player = event.getEntity();
         String form = currentMobForm.toLowerCase();
 
@@ -331,6 +333,47 @@ public class MobManager {
             event.setCancellationResult(InteractionResult.SUCCESS);
             event.setCanceled(true);
         }
+    }
+
+    // [YENİ] GameEvents'in aradığı eksik handleAttack metodu eklendi
+    @SubscribeEvent
+    public static void handleAttack(LivingAttackEvent event) {
+        if (event.getSource().getEntity() instanceof Player player) {
+            String form = currentMobForm.toLowerCase();
+            if (!canMobDealDamage(form)) {
+                event.setCanceled(true);
+            }
+        }
+    }
+
+    // [YENİ] GameEvents'in aradığı eksik handleLivingHurt metodu eklendi
+    @SubscribeEvent
+    public static void handleLivingHurt(LivingHurtEvent event) {
+        // Hasar mekanikleri gerektiğinde buradan özelleştirilebilir
+    }
+
+    // [YENİ] GameEvents'in aradığı eksik isInteractionRestricted metodu
+    public static boolean isInteractionRestricted(ServerPlayer player) {
+        String form = currentMobForm.toLowerCase();
+        // Balıklar ve yarasa formundayken eşyalarla/köylülerle etkileşime girmeyi engeller
+        return form.contains("salmon") || form.contains("cod") || form.contains("pufferfish") || form.contains("bat");
+    }
+
+    // [YENİ] GameEvents'in aradığı eksik isBlockInteractionRestricted metodu
+    public static boolean isBlockInteractionRestricted(ServerPlayer player, BlockPos pos) {
+        String form = currentMobForm.toLowerCase();
+        // Hayvan ve balık formlarındayken blok kırmayı/kullanmayı engeller
+        return form.contains("salmon") || form.contains("cod") || form.contains("pufferfish") || form.contains("bat");
+    }
+
+    // [YENİ] GameEvents'in aradığı eksik canEatFood metodu
+    public static boolean canEatFood(String form, String foodName) {
+        form = form.toLowerCase();
+        // İnek ve koyun sadece buğday türevleri yiyebilir, et yiyemez gibi kurallar
+        if (form.contains("cow") || form.contains("sheep")) {
+            return foodName.contains("wheat") || foodName.contains("bread");
+        }
+        return true; 
     }
 
     public static void handlePlayerRespawn(ServerPlayer player) {
@@ -505,7 +548,8 @@ public class MobManager {
         return TIER_0;
     }
 
-    private static void applyFormSpawnLocation(ServerPlayer player) {
-        // İhtiyaca göre doğma konumu mantığı eklenebilir.
-     }
-  }     
+    // [DÜZELTİLDİ] GameEvents'in erişebilmesi için private'tan public'e çekildi
+    public static void applyFormSpawnLocation(ServerPlayer player) {
+        // Doğma lokasyon algoritması
+    }
+}
