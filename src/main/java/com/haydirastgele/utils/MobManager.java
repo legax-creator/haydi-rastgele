@@ -41,7 +41,6 @@ public class MobManager {
     public static String currentMobForm = "human";
     private static final Random random = new Random();
 
-    // Evrim ve adaptasyon sayaçları
     private static final Map<UUID, Integer> waterTicks = new HashMap<>();
     private static final Map<UUID, Integer> desertTicks = new HashMap<>();
     private static final Map<UUID, Integer> snowTicks = new HashMap<>();
@@ -52,7 +51,6 @@ public class MobManager {
     public static int nextQuestTriggerTicks = random.nextInt(36000); 
     private static int timeSinceLastQuestTicks = 0;
 
-    // Senin orijinal listen
     private static final List<String> TIER_0 = Arrays.asList("salmon", "cod", "villager", "strider", "frog");
     private static final List<String> TIER_10 = Arrays.asList("pufferfish", "silverfish", "horse", "donkey", "parrot", "sniffer", "wandering_trader", "bat", "bee");
     private static final List<String> TIER_20 = Arrays.asList("hoglin", "zombified_piglin", "piglin", "llama");
@@ -65,7 +63,6 @@ public class MobManager {
     private static final List<String> TIER_90 = Arrays.asList("iron_golem");
     private static final List<String> TIER_100 = Arrays.asList("warden", "wither", "elder_guardian");
 
-    // Hitbox ve Boyut Değişim Event'i
     @SubscribeEvent
     public static void onPlayerSize(EntityEvent.Size event) {
         if (event.getEntity() instanceof ServerPlayer player) {
@@ -179,7 +176,6 @@ public class MobManager {
         ServerLevel level = player.serverLevel();
         BlockPos pos = player.blockPosition();
 
-        // FANTOM KONTROLÜ: Elytra'yı sırtında kilitli tutar
         if (form.contains("phantom")) {
             if (player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).getItem() != Items.ELYTRA) {
                 player.setItemSlot(net.minecraft.world.entity.EquipmentSlot.CHEST, new ItemStack(Items.ELYTRA));
@@ -188,6 +184,18 @@ public class MobManager {
             if (!form.equals("human") && player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).getItem() == Items.ELYTRA) {
                 player.setItemSlot(net.minecraft.world.entity.EquipmentSlot.CHEST, ItemStack.EMPTY);
             }
+        }
+
+        // Zombiler çürük et yiyince açlık zehirlenmesi yaşamasın
+        if (form.contains("zombie") || form.equals("husk") || form.equals("drowned")) {
+            if (player.hasEffect(MobEffects.HUNGER)) {
+                player.removeEffect(MobEffects.HUNGER);
+            }
+        }
+
+        // Kadim Yaratıklar hep tok kalsın
+        if (form.contains("warden") || (form.contains("wither") && !form.contains("skeleton"))) {
+            player.getFoodData().setFoodLevel(20);
         }
 
         if ((form.contains("skeleton") || form.equals("zombie") || form.equals("husk")) && level.isDay() && level.canSeeSky(pos)) {
@@ -213,6 +221,7 @@ public class MobManager {
             }
         }
 
+        // --- YENİ DİYET ENVANTER İSTİSNALARI ---
         if (!form.equals("human")) {
             for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
                 if (i != 0 && i != 1 && i != 9) {
@@ -220,12 +229,34 @@ public class MobManager {
                     if (!stack.isEmpty() && stack.getItem() != Items.BARRIER) {
                         boolean allowed = stack.isEdible();
                         
-                        // [GÜNCELLENDİ] Tavuk için tohumlar envanterde bariyer olmasın
-                        if (form.contains("chicken") && stack.getItem() == Items.WHEAT_SEEDS) {
+                        if (form.contains("chicken") && (stack.getItem() == Items.WHEAT_SEEDS || stack.getItem() == Items.PUMPKIN_SEEDS || stack.getItem() == Items.MELON_SEEDS || stack.getItem() == Items.BEETROOT_SEEDS)) {
                             allowed = true;
                         }
-                        // [GÜNCELLENDİ] İnek ve Koyun için buğday envanterde silinmesin
-                        if ((form.contains("cow") || form.contains("sheep")) && stack.getItem() == Items.WHEAT) {
+                        if ((form.contains("cow") || form.contains("sheep")) && (stack.getItem() == Items.WHEAT || stack.getItem() == Items.BREAD)) {
+                            allowed = true;
+                        }
+                        if (form.contains("iron_golem") && stack.getItem() == Items.IRON_INGOT) {
+                            allowed = true;
+                        }
+                        if (form.contains("snow_golem") && (stack.getItem() == Items.SNOWBALL || stack.getItem() == Blocks.ICE.asItem() || stack.getItem() == Blocks.PACKED_ICE.asItem() || stack.getItem() == Blocks.BLUE_ICE.asItem())) {
+                            allowed = true;
+                        }
+                        if ((form.contains("zombie") || form.equals("husk") || form.equals("drowned")) && (stack.getItem() == Items.ROTTEN_FLESH || stack.getItem() == Items.RAW_BEEF || stack.getItem() == Items.RAW_CHICKEN || stack.getItem() == Items.RAW_PORKCHOP || stack.getItem() == Items.RAW_MUTTON)) {
+                            allowed = true;
+                        }
+                        if ((form.contains("spider") || form.contains("cave_spider")) && (stack.getItem() == Items.SPIDER_EYE || stack.getItem() == Items.RAW_CHICKEN || stack.getItem() == Items.RAW_BEEF)) {
+                            allowed = true;
+                        }
+                        if ((form.contains("piglin") || form.contains("zombified_piglin")) && (stack.getItem() == Items.GOLDEN_CARROT || stack.getItem() == Items.GOLDEN_APPLE || stack.getItem() == Items.ENCHANTED_GOLDEN_APPLE || stack.getItem() == Items.PORKCHOP || stack.getItem() == Items.COOKED_PORKCHOP)) {
+                            allowed = true;
+                        }
+                        if (form.contains("enderman") && stack.getItem() == Items.CHORUS_FRUIT) {
+                            allowed = true;
+                        }
+                        if ((form.contains("bat") || form.contains("parrot")) && (stack.getItem() == Items.SWEET_BERRIES || stack.getItem() == Items.MELON_SLICE || stack.getItem() == Items.WHEAT_SEEDS)) {
+                            allowed = true;
+                        }
+                        if ((form.contains("salmon") || form.contains("cod") || form.contains("pufferfish")) && stack.getItem() == Items.DRIED_KELP) {
                             allowed = true;
                         }
                         if (form.contains("skeleton") && (stack.getItem() == Items.BOW || stack.getItem() == Items.ARROW)) {
@@ -294,7 +325,7 @@ public class MobManager {
                 snowTicks.put(uuid, 0);
             }
         }
-    }
+   }
         public static boolean hasSpecialAbility(String form) {
         form = form.toLowerCase();
         return form.contains("ghast") || form.contains("warden") || form.contains("wither") || 
@@ -346,6 +377,35 @@ public class MobManager {
         }
     }
 
+    // Demir Golem ve Kar Golemi gibi normalde yemek yiyemeyen formlar için sağ tık tüketim event'i
+    @SubscribeEvent
+    public static void onRightClickItem(PlayerInteractEvent.RightClickItem event) {
+        Player player = event.getEntity();
+        if (player.level().isClientSide) return;
+        String form = currentMobForm.toLowerCase();
+        ItemStack stack = event.getItemStack();
+        
+        if (form.contains("iron_golem") && stack.is(Items.IRON_INGOT)) {
+            if (player.getFoodData().needsFood() || player.getHealth() < player.getMaxHealth()) {
+                stack.shrink(1);
+                player.getFoodData().eat(5, 0.8F);
+                player.heal(12.0F);
+                player.playSound(net.minecraft.sounds.SoundEvents.IRON_GOLEM_REPAIR, 1.0F, 1.0F);
+                event.setCancellationResult(InteractionResult.SUCCESS);
+                event.setCanceled(true);
+            }
+        }
+        else if (form.contains("snow_golem") && (stack.is(Items.SNOWBALL) || stack.is(Blocks.ICE.asItem()) || stack.is(Blocks.PACKED_ICE.asItem()))) {
+            if (player.getFoodData().needsFood()) {
+                stack.shrink(1);
+                player.getFoodData().eat(3, 0.3F);
+                player.playSound(net.minecraft.sounds.SoundEvents.SNOW_BREAK, 1.0F, 1.2F);
+                event.setCancellationResult(InteractionResult.SUCCESS);
+                event.setCanceled(true);
+            }
+        }
+    }
+
     @SubscribeEvent
     public static void handleInteract(PlayerInteractEvent.EntityInteract event) {
         Player player = event.getEntity();
@@ -378,35 +438,78 @@ public class MobManager {
         return form.contains("salmon") || form.contains("cod") || form.contains("pufferfish") || form.contains("bat");
     }
 
-    // [GÜNCELLENDİ] Blok kırma kısıtlamalarına hayvanlar için özel istisnalar ekhlendi
+    // [GÜNCELLENDİ] Tüm mobların kendi yiyecek bloklarını kırma izinleri tanımlandı
     public static boolean isBlockInteractionRestricted(ServerPlayer player, BlockPos pos) {
         String form = currentMobForm.toLowerCase();
-        if (form.equals("human")) return false; // İnsan her şeyi kırar.
+        if (form.equals("human")) return false; 
 
         net.minecraft.world.level.block.state.BlockState state = player.serverLevel().getBlockState(pos);
 
+        // Tavuk 1.20.1 sürümüne uygun çimenleri ve eğrelti otlarını kırabilir
         if (form.contains("chicken")) {
-            // Tavuk çimenleri kırıp tohum çıkarabilir.
-            return !(state.is(Blocks.SHORT_GRASS) || state.is(Blocks.TALL_GRASS) || state.is(Blocks.FERN));
+            return !(state.is(Blocks.GRASS) || state.is(Blocks.TALL_GRASS) || state.is(Blocks.FERN));
         }
+        // İnek ve Koyun tarladan direkt buğday kırabilir
         if (form.contains("cow") || form.contains("sheep")) {
-            // İnek ve koyun tarladaki buğdayları kırıp beslenebilir.
             return !state.is(Blocks.WHEAT);
         }
+        // Enderman koro bitkilerini sökebilir
+        if (form.contains("enderman")) {
+            return !(state.is(Blocks.CHORUS_PLANT) || state.is(Blocks.CHORUS_FLOWER));
+        }
+        // Demir Golem demir madenlerini ve bloklarını parçalayabilir
+        if (form.contains("iron_golem")) {
+            return !(state.is(Blocks.IRON_ORE) || state.is(Blocks.DEEPSLATE_IRON_ORE) || state.is(Blocks.IRON_BLOCK) || state.is(Blocks.RAW_IRON_BLOCK));
+        }
+        // Kar Golemi kar ve buz kütlelerini eritip alabilir
+        if (form.contains("snow_golem")) {
+            return !(state.is(Blocks.SNOW) || state.is(Blocks.SNOW_BLOCK) || state.is(Blocks.ICE) || state.is(Blocks.PACKED_ICE));
+        }
+        // Yarasa ve Papağan tatlı orman meyvesi çalılarını hasat edebilir
+        if (form.contains("bat") || form.contains("parrot")) {
+            return !state.is(Blocks.SWEET_BERRY_BUSH);
+        }
+        // Balık havuzları su yosunu (Kelp) bloklarını koparabilir
+        if (form.contains("salmon") || form.contains("cod") || form.contains("pufferfish")) {
+            return !(state.is(Blocks.KELP) || state.is(Blocks.KELP_PLANT));
+        }
 
-        return true; // Diğer tüm canavarlar/hayvanlar için blok kırmak yasak.
+        return true; 
     }
 
-    // [GÜNCELLENDİ] Tavuk için tohum yeme izni eklendi
+    // [GÜNCELLENDİ] Canavarların ve diğer canlıların detaylı yeni diyet haritası
     public static boolean canEatFood(String form, String foodName) {
         form = form.toLowerCase();
         foodName = foodName.toLowerCase();
+        
+        if (form.equals("human")) return true;
+        if (form.contains("warden") || (form.contains("wither") && !form.contains("skeleton"))) return false;
+
         if (form.contains("cow") || form.contains("sheep")) {
             return foodName.contains("wheat") || foodName.contains("bread");
         }
         if (form.contains("chicken")) {
             return foodName.contains("seed");
         }
+        if (form.contains("zombie") || form.equals("husk") || form.equals("drowned")) {
+            return foodName.contains("rotten") || foodName.contains("raw");
+        }
+        if (form.contains("spider") || form.contains("cave_spider")) {
+            return foodName.contains("spider_eye") || foodName.contains("raw");
+        }
+        if (form.contains("piglin")) {
+            return foodName.contains("gold") || foodName.contains("porkchop");
+        }
+        if (form.contains("enderman")) {
+            return foodName.contains("chorus");
+        }
+        if (form.contains("bat") || form.contains("parrot")) {
+            return foodName.contains("berry") || foodName.contains("melon") || foodName.contains("seed");
+        }
+        if (form.contains("salmon") || form.contains("cod") || form.contains("pufferfish")) {
+            return foodName.contains("kelp");
+        }
+        
         return true; 
     }
 
@@ -597,5 +700,4 @@ public class MobManager {
     public static void applyFormSpawnLocation(ServerPlayer player) {
     }
 }
-
-    
+            
