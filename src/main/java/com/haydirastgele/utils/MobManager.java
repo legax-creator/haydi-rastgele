@@ -179,6 +179,17 @@ public class MobManager {
         ServerLevel level = player.serverLevel();
         BlockPos pos = player.blockPosition();
 
+        // FANTOM KONTROLÜ: Elytra'yı sırtında kilitli tutar
+        if (form.contains("phantom")) {
+            if (player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).getItem() != Items.ELYTRA) {
+                player.setItemSlot(net.minecraft.world.entity.EquipmentSlot.CHEST, new ItemStack(Items.ELYTRA));
+            }
+        } else {
+            if (!form.equals("human") && player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).getItem() == Items.ELYTRA) {
+                player.setItemSlot(net.minecraft.world.entity.EquipmentSlot.CHEST, ItemStack.EMPTY);
+            }
+        }
+
         if ((form.contains("skeleton") || form.equals("zombie") || form.equals("husk")) && level.isDay() && level.canSeeSky(pos)) {
             player.setSecondsOnFire(8);
         }
@@ -207,7 +218,21 @@ public class MobManager {
                 if (i != 0 && i != 1 && i != 9) {
                     ItemStack stack = player.getInventory().getItem(i);
                     if (!stack.isEmpty() && stack.getItem() != Items.BARRIER) {
-                        if (!stack.isEdible() && !(form.contains("skeleton") && (stack.getItem() == Items.BOW || stack.getItem() == Items.ARROW))) {
+                        boolean allowed = stack.isEdible();
+                        
+                        // [GÜNCELLENDİ] Tavuk için tohumlar envanterde bariyer olmasın
+                        if (form.contains("chicken") && stack.getItem() == Items.WHEAT_SEEDS) {
+                            allowed = true;
+                        }
+                        // [GÜNCELLENDİ] İnek ve Koyun için buğday envanterde silinmesin
+                        if ((form.contains("cow") || form.contains("sheep")) && stack.getItem() == Items.WHEAT) {
+                            allowed = true;
+                        }
+                        if (form.contains("skeleton") && (stack.getItem() == Items.BOW || stack.getItem() == Items.ARROW)) {
+                            allowed = true;
+                        }
+
+                        if (!allowed) {
                             player.getInventory().setItem(i, new ItemStack(Items.BARRIER));
                         }
                     }
@@ -321,7 +346,6 @@ public class MobManager {
         }
     }
 
-    // [DÜZELTİLDİ] İsmi GameEvents'in aradığı gibi "handleInteract" yapıldı
     @SubscribeEvent
     public static void handleInteract(PlayerInteractEvent.EntityInteract event) {
         Player player = event.getEntity();
@@ -335,7 +359,6 @@ public class MobManager {
         }
     }
 
-    // [YENİ] GameEvents'in aradığı eksik handleAttack metodu eklendi
     @SubscribeEvent
     public static void handleAttack(LivingAttackEvent event) {
         if (event.getSource().getEntity() instanceof Player player) {
@@ -346,32 +369,43 @@ public class MobManager {
         }
     }
 
-    // [YENİ] GameEvents'in aradığı eksik handleLivingHurt metodu eklendi
     @SubscribeEvent
     public static void handleLivingHurt(LivingHurtEvent event) {
-        // Hasar mekanikleri gerektiğinde buradan özelleştirilebilir
     }
 
-    // [YENİ] GameEvents'in aradığı eksik isInteractionRestricted metodu
     public static boolean isInteractionRestricted(ServerPlayer player) {
         String form = currentMobForm.toLowerCase();
-        // Balıklar ve yarasa formundayken eşyalarla/köylülerle etkileşime girmeyi engeller
         return form.contains("salmon") || form.contains("cod") || form.contains("pufferfish") || form.contains("bat");
     }
 
-    // [YENİ] GameEvents'in aradığı eksik isBlockInteractionRestricted metodu
+    // [GÜNCELLENDİ] Blok kırma kısıtlamalarına hayvanlar için özel istisnalar ekhlendi
     public static boolean isBlockInteractionRestricted(ServerPlayer player, BlockPos pos) {
         String form = currentMobForm.toLowerCase();
-        // Hayvan ve balık formlarındayken blok kırmayı/kullanmayı engeller
-        return form.contains("salmon") || form.contains("cod") || form.contains("pufferfish") || form.contains("bat");
+        if (form.equals("human")) return false; // İnsan her şeyi kırar.
+
+        net.minecraft.world.level.block.state.BlockState state = player.serverLevel().getBlockState(pos);
+
+        if (form.contains("chicken")) {
+            // Tavuk çimenleri kırıp tohum çıkarabilir.
+            return !(state.is(Blocks.SHORT_GRASS) || state.is(Blocks.TALL_GRASS) || state.is(Blocks.FERN));
+        }
+        if (form.contains("cow") || form.contains("sheep")) {
+            // İnek ve koyun tarladaki buğdayları kırıp beslenebilir.
+            return !state.is(Blocks.WHEAT);
+        }
+
+        return true; // Diğer tüm canavarlar/hayvanlar için blok kırmak yasak.
     }
 
-    // [YENİ] GameEvents'in aradığı eksik canEatFood metodu
+    // [GÜNCELLENDİ] Tavuk için tohum yeme izni eklendi
     public static boolean canEatFood(String form, String foodName) {
         form = form.toLowerCase();
-        // İnek ve koyun sadece buğday türevleri yiyebilir, et yiyemez gibi kurallar
+        foodName = foodName.toLowerCase();
         if (form.contains("cow") || form.contains("sheep")) {
             return foodName.contains("wheat") || foodName.contains("bread");
+        }
+        if (form.contains("chicken")) {
+            return foodName.contains("seed");
         }
         return true; 
     }
@@ -397,7 +431,15 @@ public class MobManager {
         form = form.toLowerCase();
         player.getInventory().clearContent();
 
-        if (form.contains("skeleton") && !form.contains("wither")) {
+        for (net.minecraft.world.entity.EquipmentSlot slot : net.minecraft.world.entity.EquipmentSlot.values()) {
+            if (slot.isArmor()) {
+                player.setItemSlot(slot, ItemStack.EMPTY);
+            }
+        }
+
+        if (form.contains("phantom")) {
+            player.setItemSlot(net.minecraft.world.entity.EquipmentSlot.CHEST, new ItemStack(Items.ELYTRA));
+        } else if (form.contains("skeleton") && !form.contains("wither")) {
             ItemStack bow = new ItemStack(Items.BOW);
             bow.enchant(Enchantments.INFINITY_ARROWS, 1);
             player.getInventory().setItem(0, bow);
@@ -423,11 +465,17 @@ public class MobManager {
     public static void applyFormRestrictions(ServerPlayer player) {
         String form = currentMobForm.toLowerCase();
 
-        if (form.contains("bat") || form.contains("phantom") || form.contains("ghast") || form.contains("wither")) {
+        if (form.contains("bat") || form.contains("ghast") || form.contains("wither")) {
             player.getAbilities().mayfly = true;
+            if (form.contains("bat")) {
+                player.getAbilities().setFlyingSpeed(0.09F); 
+            } else {
+                player.getAbilities().setFlyingSpeed(0.025F); 
+            }
         } else {
             player.getAbilities().mayfly = false;
             player.getAbilities().flying = false;
+            player.getAbilities().setFlyingSpeed(0.05F); 
         }
         player.onUpdateAbilities();
 
@@ -461,7 +509,6 @@ public class MobManager {
         player.refreshDimensions();
     }
 
-    // --- BOYUT METOTLARI ---
     public static float getMobWidth(String form) {
         form = form.toLowerCase();
         if (form.contains("ghast")) return 4.0F;
@@ -498,7 +545,6 @@ public class MobManager {
         return 1.62F;
     }
 
-    // --- YARDIMCI METOTLAR VE UYUMLULUK KATMANI ---
     private static double getOriginalMobHealth(String form) {
         if (form.contains("warden")) return 500.0D;
         if (form.contains("wither")) return 300.0D;
@@ -548,8 +594,8 @@ public class MobManager {
         return TIER_0;
     }
 
-    // [DÜZELTİLDİ] GameEvents'in erişebilmesi için private'tan public'e çekildi
     public static void applyFormSpawnLocation(ServerPlayer player) {
-        // Doğma lokasyon algoritması
     }
 }
+
+    
