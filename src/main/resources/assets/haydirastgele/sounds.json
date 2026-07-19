@@ -1,0 +1,15 @@
+{
+  "salmon_quest_music": {
+    "category": "music",
+    "sounds": [{ "name": "haydirastgele:salmon_run", "stream": true }]
+  },
+  "sheep_quest_music": {
+    "category": "music",
+    "sounds": [{ "name": "haydirastgele:sheep_escape", "stream": true }]
+  },
+  "wither_quest_music": {
+    "category": "music",
+    "sounds": [{ "name": "haydirastgele:wither_boss", "stream": true }]
+  }
+}
+
