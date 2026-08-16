@@ -6,7 +6,6 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.EntityEvent;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
@@ -24,6 +23,12 @@ public class GameEvents {
         if (event.phase == TickEvent.Phase.END && event.player instanceof ServerPlayer player) {
             // Yeni eklenen genel form kısıtlamaları (Zıplama yasağı, otomatik zıplama basamak ayarı, çevre etkileri, envanter kilitleri)
             MobManager.applyGlobalFormRestrictions(player);
+            MobManager.tickSurvivalTask(player);
+
+            // Bu oyuncu başka bir oyuncuya biniyorsa, WASD'ini o oyuncuya (mount'a) uygula
+            if (player.getVehicle() instanceof ServerPlayer mountPlayer) {
+                MobManager.applyRiderControlToMount(player, mountPlayer);
+            }
             
             MobManager.tickQuest(player);
             
@@ -36,6 +41,9 @@ public class GameEvents {
     @SubscribeEvent
     public static void onPlayerDeath(LivingDeathEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
+            // Forma özel ölüm mesajı (örn: "X bir Zombi olarak açlıktan öldü")
+            MobManager.applyCustomDeathMessage(event, player);
+
             if (!MobManager.activeQuestType.equals("NONE")) {
                 MobManager.completeQuest(player, false);
             } else {
@@ -79,8 +87,8 @@ public class GameEvents {
     @SubscribeEvent
     public static void onBlockBreak(BlockEvent.BreakEvent event) {
         if (event.getPlayer() instanceof ServerPlayer player) {
-            // Köylü formunda değilse veya etkileşim kısıtlıysa engelle
-            if (MobManager.isInteractionRestricted(player)) {
+            // Artık her formun kırabildiği blok türü ayrı ayrı, gerçekçi bir şekilde kontrol ediliyor
+            if (!MobManager.canBreakBlock(MobManager.getForm(player.getUUID()), event.getState())) {
                 event.setCanceled(true);
             }
         }
@@ -89,8 +97,8 @@ public class GameEvents {
     @SubscribeEvent
     public static void onBlockPlace(BlockEvent.EntityPlaceEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
-            // Köylü formunda değilse veya etkileşim kısıtlıysa engelle
-            if (MobManager.isInteractionRestricted(player)) {
+            // Yerleştirme izni de aynı "bu blok türüyle etkileşebilir mi" mantığına bağlandı
+            if (!MobManager.canBreakBlock(MobManager.getForm(player.getUUID()), event.getPlacedBlock())) {
                 event.setCanceled(true);
             }
         }
@@ -104,7 +112,7 @@ public class GameEvents {
         if (!player.level().isClientSide() && player instanceof ServerPlayer serverPlayer) {
             // Keçi boynuzu basılınca (Enderman, Kirpi balığı, Lama, Kar Golemi) yeteneklerini tetikler
             if (stack.is(Items.GOAT_HORN)) {
-                String form = MobManager.currentMobForm.toLowerCase();
+                String form = MobManager.getForm(serverPlayer.getUUID()).toLowerCase();
                 if (MobManager.hasSpecialAbility(form)) {
                     MobManager.triggerFormAbility(serverPlayer);
                     event.getEntity().swing(event.getHand(), true);
@@ -130,7 +138,7 @@ public class GameEvents {
 
         if (stack.getItem().isEdible()) {
             String foodName = stack.getItem().toString();
-            if (!MobManager.canEatFood(MobManager.currentMobForm, foodName)) {
+            if (!MobManager.canEatFood(MobManager.getForm(player.getUUID()), foodName)) {
                 event.setCanceled(true);
                 if (!player.level().isClientSide()) {
                     player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
@@ -141,18 +149,9 @@ public class GameEvents {
         }
     }
 
-    @SubscribeEvent
-    public static void onPlayerSize(EntityEvent.Size event) {
-        if (event.getEntity() instanceof Player player) {
-            String form = MobManager.currentMobForm;
-            if (!form.equalsIgnoreCase("human")) {
-                float width = MobManager.getMobWidth(form);
-                float height = MobManager.getMobHeight(form);
-                float eyeHeight = MobManager.getMobEyeHeight(form);
-                
-                event.setNewSize(net.minecraft.world.entity.EntityDimensions.scalable(width, height));
-                event.setNewEyeHeight(eyeHeight);
-            }
-        }
-    }
+    // NOT: Hitbox/boyut (EntityEvent.Size) artık SADECE MobManager.onPlayerSize içinde yönetiliyor.
+    // Önceden burada da ikinci bir dinleyici vardı; aynı event'i iki farklı yöntemle
+    // (scalable vs fixed) ve iki farklı koşulla işlemeleri client/server arasında
+    // tutarsız hitbox'lara (asıl "hitbox doğru değil" sorununun kaynağı) yol açıyordu.
+    // Artık tek doğru kaynak MobManager.
 }
