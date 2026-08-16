@@ -1304,10 +1304,10 @@ public class MobManager {
             findNetherSpawn(server, player, form);
         } else if (form.equals("warden")) {
             findStructureSpawn(server, player, Level.OVERWORLD,
-                    ResourceKey.create(Registries.STRUCTURE, new net.minecraft.resources.ResourceLocation("minecraft:ancient_city")), 100000);
+                    net.minecraft.resources.ResourceKey.create(Registries.STRUCTURE, new net.minecraft.resources.ResourceLocation("minecraft:ancient_city")), 100000);
         } else if (form.equals("elder_guardian")) {
             findStructureSpawn(server, player, Level.OVERWORLD,
-                    ResourceKey.create(Registries.STRUCTURE, new net.minecraft.resources.ResourceLocation("minecraft:monument")), 10000);
+                    net.minecraft.resources.ResourceKey.create(Registries.STRUCTURE, new net.minecraft.resources.ResourceLocation("minecraft:monument")), 10000);
         } else if (form.equals("villager") || form.equals("wandering_trader")) {
             findVillageSpawn(server, player);
         } else {
@@ -1328,7 +1328,7 @@ public class MobManager {
             // geri kalanı açık Nether biyomlarında doğar. Diğer Nether mobları için Bastion özel bir durum değildir.
             if (form.equals("piglin") && random.nextDouble() < 0.28D) {
                 found = findNearestStructureByKey(nether,
-                        ResourceKey.create(Registries.STRUCTURE, new net.minecraft.resources.ResourceLocation("minecraft:bastion_remnant")), origin, 10000);
+                        net.minecraft.resources.ResourceKey.create(Registries.STRUCTURE, new net.minecraft.resources.ResourceLocation("minecraft:bastion_remnant")), origin, 10000);
             }
 
             if (found == null) {
