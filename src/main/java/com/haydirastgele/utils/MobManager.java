@@ -36,7 +36,8 @@ import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.StructureTags;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.core.HolderSet;
-import net.minecraft.data.worldgen.BuiltinStructures;
+// import net.minecraft.data.worldgen.BuiltinStructures; -> KALDIRILDI: bu class datagen'e özel,
+// normal (main) derlemede bulunmuyordu. Onun yerine aşağıda doğrudan ResourceKey.create + string ID kullanılıyor.
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.Biomes;
@@ -637,18 +638,22 @@ public class MobManager {
     // bir yöntem (örn. ServerboundPlayerInputPacket'i doğrudan dinlemek) deneriz.
     private static final java.lang.reflect.Field XXA_FIELD;
     private static final java.lang.reflect.Field ZZA_FIELD;
+    private static final java.lang.reflect.Field JUMPING_FIELD;
     static {
-        java.lang.reflect.Field xf = null, zf = null;
+        java.lang.reflect.Field xf = null, zf = null, jf = null;
         try {
             xf = LivingEntity.class.getDeclaredField("xxa");
             xf.setAccessible(true);
             zf = LivingEntity.class.getDeclaredField("zza");
             zf.setAccessible(true);
+            jf = LivingEntity.class.getDeclaredField("jumping");
+            jf.setAccessible(true);
         } catch (Exception ignored) {
             // Alan isimleri bulunamadı - WASD yönlendirme devre dışı kalır, mod yine de çalışmaya devam eder.
         }
         XXA_FIELD = xf;
         ZZA_FIELD = zf;
+        JUMPING_FIELD = jf;
     }
 
     public static void applyRiderControlToMount(ServerPlayer rider, ServerPlayer mount) {
@@ -672,7 +677,8 @@ public class MobManager {
             mount.setDeltaMovement(worldMotion.x * speed, mount.getDeltaMovement().y, worldMotion.z * speed);
             mount.hurtMarked = true; // client'a senkronize et
 
-            if (rider.jumping && mount.onGround()) {
+            boolean isJumping = JUMPING_FIELD != null && JUMPING_FIELD.getBoolean(rider);
+            if (isJumping && mount.onGround()) {
                 mount.setDeltaMovement(mount.getDeltaMovement().x, 0.42D, mount.getDeltaMovement().z);
             }
         } catch (IllegalAccessException ignored) {
@@ -701,7 +707,7 @@ public class MobManager {
     // Doğal av-avcı ilişkileri (örn. Iron Golem -> Zombi) bu kuralın istisnasıdır.
     @SubscribeEvent
     public static void onLivingChangeTarget(LivingChangeTargetEvent event) {
-        if (!(event.getNewAboutToBeSetTarget() instanceof ServerPlayer targetPlayer)) return;
+        if (!(event.getNewTarget() instanceof ServerPlayer targetPlayer)) return;
         if (!(event.getEntity() instanceof Mob mob)) return;
 
         if (aggroedByPlayer.contains(mob.getUUID())) return; // tahrik edilmiş, saldırmasına izin ver
@@ -1297,9 +1303,11 @@ public class MobManager {
         if (NETHER_FORMS.contains(form)) {
             findNetherSpawn(server, player, form);
         } else if (form.equals("warden")) {
-            findStructureSpawn(server, player, Level.OVERWORLD, BuiltinStructures.ANCIENT_CITY, 100000);
+            findStructureSpawn(server, player, Level.OVERWORLD,
+                    ResourceKey.create(Registries.STRUCTURE, new net.minecraft.resources.ResourceLocation("minecraft:ancient_city")), 100000);
         } else if (form.equals("elder_guardian")) {
-            findStructureSpawn(server, player, Level.OVERWORLD, BuiltinStructures.OCEAN_MONUMENT, 10000);
+            findStructureSpawn(server, player, Level.OVERWORLD,
+                    ResourceKey.create(Registries.STRUCTURE, new net.minecraft.resources.ResourceLocation("minecraft:monument")), 10000);
         } else if (form.equals("villager") || form.equals("wandering_trader")) {
             findVillageSpawn(server, player);
         } else {
@@ -1319,7 +1327,8 @@ public class MobManager {
             // Piglin'in gerçek vanilla'da Bastion Kalıntısı içinde doğma olasılığı yaklaşık %25-30 civarıdır,
             // geri kalanı açık Nether biyomlarında doğar. Diğer Nether mobları için Bastion özel bir durum değildir.
             if (form.equals("piglin") && random.nextDouble() < 0.28D) {
-                found = findNearestStructureByKey(nether, BuiltinStructures.BASTION_REMNANT, origin, 10000);
+                found = findNearestStructureByKey(nether,
+                        ResourceKey.create(Registries.STRUCTURE, new net.minecraft.resources.ResourceLocation("minecraft:bastion_remnant")), origin, 10000);
             }
 
             if (found == null) {
@@ -1451,7 +1460,7 @@ public class MobManager {
 
             boolean moving = entity.getDeltaMovement().horizontalDistanceSqr() > 0.0025D;
             boolean recentlyHurt = entity.hurtTime > 0;
-            boolean recentlyDamaged = entity.animationSpeed > 0.4F; // yürüme/koşma animasyon hızı - kaba bir "ses çıkarıyor" göstergesi
+            boolean recentlyDamaged = entity.getDeltaMovement().horizontalDistanceSqr() > 0.0025D; // hareket hızı - kaba bir "ses çıkarıyor" göstergesi
 
             if (!moving && !recentlyHurt && !recentlyDamaged) continue;
 
