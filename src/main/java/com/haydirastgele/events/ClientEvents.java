@@ -15,6 +15,7 @@ import net.minecraftforge.client.settings.KeyConflictContext;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import com.mojang.blaze3d.platform.InputConstants;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.HashMap;
@@ -30,7 +31,7 @@ public class ClientEvents {
     // --- FORM GÜNLÜĞÜ TUŞU (varsayılan: O) ---
     public static final KeyMapping FORM_LOG_KEY = new KeyMapping(
             "key.haydirastgele.formlog", KeyConflictContext.IN_GAME,
-            GLFW.GLFW_KEY_O, "key.categories.haydirastgele");
+            InputConstants.Type.KEYSYM.getOrCreate(GLFW.GLFW_KEY_O), "key.categories.haydirastgele");
 
     @SubscribeEvent
     public static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
